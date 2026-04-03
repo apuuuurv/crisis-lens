@@ -1,15 +1,15 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, Loader2 } from "lucide-react"
-import { apiClient } from "@/lib/api"
+import { AlertCircle, ArrowRight, Loader2, Lock, Mail, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { apiClient } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,30 +18,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const { ok, data, error: apiError } = await apiClient.login(email, password)
+      const { ok, error: apiError } = await apiClient.login(email, password)
+
       if (ok) {
-        const role = data?.role || "citizen"
-        if (role === "admin") {
-          router.push("/dashboard")
-        } else {
-          router.push("/report")
-        }
-      } else {
-        // Handle 422 error objects from FastAPI
-        const errorMessage = Array.isArray(apiError) 
-          ? apiError.map(e => e.msg).join(", ") 
-          : typeof apiError === "string" 
-            ? apiError 
-            : "Invalid credentials"
-        setError(errorMessage)
+        router.push("/dashboard")
+        return
       }
-    } catch (err) {
+
+      const errorMessage = Array.isArray(apiError)
+        ? apiError.map((item) => item.msg).join(", ")
+        : typeof apiError === "string"
+          ? apiError
+          : "Invalid credentials"
+
+      setError(errorMessage)
+    } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
@@ -49,97 +46,101 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#09090b] selection:bg-red-500/30 selection:text-red-200">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[40%] -left-[10%] w-[70%] h-[70%] bg-red-900/10 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[40%] -right-[10%] w-[70%] h-[70%] bg-zinc-900/40 rounded-full blur-[120px]" />
+    <div className="flex min-h-screen items-center justify-center bg-[#030507] px-4 selection:bg-emerald-500/30 selection:text-emerald-100">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-[10%] -top-[35%] h-[70%] w-[70%] rounded-full bg-emerald-600/10 blur-[120px]" />
+        <div className="absolute -bottom-[40%] -right-[10%] h-[70%] w-[70%] rounded-full bg-zinc-900/50 blur-[120px]" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md px-4 z-10"
+        transition={{ duration: 0.45 }}
+        className="relative z-10 w-full max-w-md"
       >
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center mb-4 border border-red-500/20">
-            <Shield className="w-8 h-8 text-red-500" />
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10">
+            <Shield className="h-8 w-8 text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">CrisisLens Admin</h1>
-          <p className="text-zinc-400 mt-2">Secure access for response coordinators</p>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-100">Crisis Lens</h1>
+          <p className="mt-2 text-zinc-400">Sign in to access live awareness, alerts, and reporting.</p>
         </div>
 
-        <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-xl shadow-2xl">
+        <Card className="border-zinc-800 bg-zinc-900/60 shadow-2xl backdrop-blur-xl">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl text-zinc-100 px-1">Welcome back</CardTitle>
-            <CardDescription className="text-zinc-500 px-1">
-              Enter your credentials to access the command center
+            <CardTitle className="px-1 text-xl text-zinc-100">Welcome back</CardTitle>
+            <CardDescription className="px-1 text-zinc-500">
+              Enter your credentials to continue
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
-              {error && (
+              {error ? (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-center gap-3 text-red-400 text-sm"
+                  className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
                 >
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <AlertCircle className="h-4 w-4 shrink-0" />
                   <p>{error}</p>
                 </motion.div>
-              )}
-              
+              ) : null}
+
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-400">Email Address</Label>
+                <Label htmlFor="email" className="text-zinc-400">
+                  Email Address
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@crisislens.com"
                     required
-                    className="bg-zinc-950/50 border-zinc-800 text-zinc-200 pl-10 focus:ring-red-500/20 focus:border-red-500/50"
+                    placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="border-zinc-800 bg-zinc-950/50 pl-10 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-zinc-400">Password</Label>
-                </div>
+                <Label htmlFor="password" className="text-zinc-400">
+                  Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                   <Input
                     id="password"
                     type="password"
                     required
-                    className="bg-zinc-950/50 border-zinc-800 text-zinc-200 pl-10 focus:ring-red-500/20 focus:border-red-500/50"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="border-zinc-800 bg-zinc-950/50 pl-10 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20"
                   />
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4 mt-2">
-              <Button 
-                type="submit" 
+
+            <CardFooter className="mt-2 flex flex-col gap-4">
+              <Button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-red-600 hover:bg-red-500 text-white font-medium h-11 transition-all"
+                className="h-11 w-full bg-emerald-500 font-medium text-black transition-all hover:bg-emerald-400"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    Sign In <ArrowRight className="w-4 h-4 ml-2" />
+                    Sign In
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
-              <p className="text-sm text-center text-zinc-500">
-                Don't have an account?{" "}
-                <Link href="/register" className="text-red-500 hover:text-red-400 font-medium transition-colors">
-                  Request Access
+              <p className="text-center text-sm text-zinc-500">
+                Don&apos;t have an account?{" "}
+                <Link href="/register" className="font-medium text-emerald-400 transition-colors hover:text-emerald-300">
+                  Create one
                 </Link>
               </p>
             </CardFooter>

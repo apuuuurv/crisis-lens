@@ -1,16 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: 'CrisisLens | Disaster Resilience & Crisis Management',
-  description: 'Real-time crisis management dashboard for disaster response coordination, incident tracking, and resource dispatch.',
-  generator: 'v0.app',
+  title: 'Crisis Lens | Real-Time Incident Awareness',
+  description:
+    'Stay informed about nearby incidents with real-time risk signals, live alerts, and faster reporting through Crisis Lens.',
   icons: {
     icon: [
       {
@@ -31,7 +28,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1a1a2e',
+  themeColor: '#020617',
   width: 'device-width',
   initialScale: 1,
 }
@@ -42,21 +39,26 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        {children}
-        <Toaster 
-          theme="dark" 
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: 'oklch(0.18 0.01 260 / 0.9)',
-              border: '1px solid oklch(0.35 0.01 260 / 0.5)',
-              backdropFilter: 'blur(12px)',
-            },
-          }}
-        />
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+          <Toaster
+            theme="dark"
+            richColors
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: 'rgba(3, 7, 18, 0.96)',
+                border: '1px solid rgba(34, 197, 94, 0.28)',
+                color: 'rgba(244, 244, 245, 1)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 20px 60px -30px rgba(34, 197, 94, 0.55)',
+              },
+            }}
+          />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

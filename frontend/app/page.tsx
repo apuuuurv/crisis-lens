@@ -1,4 +1,4 @@
-import { LandingPage } from "@/components/crisis-lens/landing-page"
+import { LandingPage } from '@/components/landing/LandingPage'
 
 export default function Home() {
   return (
