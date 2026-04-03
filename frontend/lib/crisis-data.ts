@@ -1,5 +1,6 @@
-export type IncidentCategory = "Fire" | "Flood" | "Earthquake" | "Storm" | "Chemical" | "Medical"
+export type IncidentCategory = "Fire" | "Flood" | "Earthquake" | "Storm" | "Chemical" | "Medical" | "Accident" | "Infrastructure" | "Other"
 export type IncidentStatus = "Reported" | "Verifying" | "Active" | "Resolved"
+export type IncidentTrustStatus = "Trusted" | "Suspicious" | "Under Review"
 export type ResourceType = "Ambulance" | "Fire Truck" | "Police" | "Rescue" | "Helicopter"
 export type ResourceStatus = "Available" | "Dispatched" | "Returning"
 
@@ -11,6 +12,7 @@ export interface Incident {
   severity?: number
   report_count: number
   status: IncidentStatus
+  trust_status?: IncidentTrustStatus
   upvotes: number
   is_verified: boolean
   location: { x: number; y: number }
@@ -46,6 +48,7 @@ export const mockIncidents: Incident[] = [
     category: "Fire",
     report_count: 15,
     status: "Active",
+    trust_status: "Trusted",
     upvotes: 24,
     is_verified: true,
     location: { x: 35, y: 40 },
@@ -58,6 +61,7 @@ export const mockIncidents: Incident[] = [
     category: "Flood",
     report_count: 8,
     status: "Active",
+    trust_status: "Trusted",
     upvotes: 18,
     is_verified: true,
     location: { x: 65, y: 55 },
@@ -70,6 +74,7 @@ export const mockIncidents: Incident[] = [
     category: "Chemical",
     report_count: 3,
     status: "Verifying",
+    trust_status: "Under Review",
     upvotes: 12,
     is_verified: false,
     location: { x: 50, y: 30 },
@@ -82,6 +87,7 @@ export const mockIncidents: Incident[] = [
     category: "Medical",
     report_count: 5,
     status: "Active",
+    trust_status: "Trusted",
     upvotes: 31,
     is_verified: true,
     location: { x: 75, y: 25 },
@@ -94,6 +100,7 @@ export const mockIncidents: Incident[] = [
     category: "Earthquake",
     report_count: 12,
     status: "Active",
+    trust_status: "Trusted",
     upvotes: 45,
     is_verified: true,
     location: { x: 25, y: 60 },
@@ -106,6 +113,7 @@ export const mockIncidents: Incident[] = [
     category: "Storm",
     report_count: 4,
     status: "Reported",
+    trust_status: "Trusted",
     upvotes: 8,
     is_verified: false,
     location: { x: 80, y: 70 },
@@ -150,6 +158,9 @@ export const categoryColors: Record<IncidentCategory, string> = {
   Storm: "bg-purple-500/20 text-purple-400 border-purple-500/30",
   Chemical: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   Medical: "bg-emerald/20 text-emerald border-emerald/30",
+  Accident: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  Infrastructure: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  Other: "bg-muted text-muted-foreground border-border",
 }
 
 export const statusColors: Record<IncidentStatus, string> = {

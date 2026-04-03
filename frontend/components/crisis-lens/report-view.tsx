@@ -114,11 +114,11 @@ export function ReportView() {
 
     setIsSubmitting(true)
     try {
-      let result;
+      let submissionResult
       if (uploadedFiles.length > 0) {
         const formData = new FormData()
         formData.append("file", uploadedFiles[0])
-        result = await apiClient.reportIncidentWithImage(formData, {
+        submissionResult = await apiClient.reportIncidentWithImage(formData, {
           latitude: location[0],
           longitude: location[1],
           title: title,
@@ -126,7 +126,7 @@ export function ReportView() {
           category: category
         })
       } else {
-        result = await apiClient.reportIncident({
+        submissionResult = await apiClient.reportIncident({
           title: title.trim(),
           description: description.trim(),
           category,
@@ -136,12 +136,15 @@ export function ReportView() {
         })
       }
 
-      if (result) {
+      if (submissionResult.status === 201) {
         setIsSuccess(true)
         toast.success("Incident reported successfully")
+      } else {
+        toast.error("Report submission was not accepted by the server")
       }
     } catch (error) {
-      toast.error("Failed to submit report")
+      const message = error instanceof Error ? error.message : "Failed to submit report"
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }

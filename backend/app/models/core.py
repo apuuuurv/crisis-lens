@@ -17,6 +17,11 @@ class IncidentStatus(str, enum.Enum):
     active = "active"
     resolved = "resolved"
 
+class IncidentTrustStatus(str, enum.Enum):
+    trusted = "Trusted"
+    suspicious = "Suspicious"
+    under_review = "Under Review"
+
 class User(Base):
     __tablename__ = "users"
     
@@ -53,6 +58,7 @@ class Incident(Base):
     longitude = Column(Float)
     address = Column(String, nullable=True)
     status = Column(Enum(IncidentStatus), default=IncidentStatus.reported)
+    trust_status = Column(String, default=IncidentTrustStatus.trusted.value)
     reported_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -63,6 +69,19 @@ class Incident(Base):
     # Relationships
     reporter = relationship("User", back_populates="incidents")
     resources = relationship("Resource", back_populates="incident")
+
+class ReportSubmission(Base):
+    __tablename__ = "report_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")
+    incident = relationship("Incident")
 
 class Resource(Base):
     __tablename__ = "resources"

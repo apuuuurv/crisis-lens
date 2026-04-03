@@ -19,6 +19,7 @@ export interface BackendIncident {
   longitude: number
   address: string | null
   status: string
+  trust_status: string
   upvotes: number
   is_verified: boolean
   created_at: string
@@ -96,6 +97,11 @@ export const normalizeIncident = (inc: BackendIncident): Incident => ({
   address: inc.address || undefined,
 })
 
+export interface ReportSubmissionResult {
+  incident: Incident
+  status: number
+}
+
 export const normalizeResource = (res: BackendResource): Resource => ({
   ...res,
   id: String(res.id),
@@ -164,11 +170,13 @@ export const apiClient = {
   },
 
   reportIncident: async (incident: any) => {
-    const { ok, data } = await safeFetch("/incidents/", {
+    const { ok, data, error, status } = await safeFetch("/incidents/", {
       method: "POST",
       body: JSON.stringify(incident),
     })
-    return ok ? normalizeIncident(data) : null
+    if (!ok) throw new Error(error || "Failed to submit report")
+    if (!data || typeof data !== "object") throw new Error("Invalid server response")
+    return { incident: normalizeIncident(data), status } as ReportSubmissionResult
   },
 
   reportIncidentWithImage: async (formData: FormData, metadata?: { 
@@ -187,11 +195,13 @@ export const apiClient = {
       if (metadata.category) formData.append("category", metadata.category)
       if (metadata.severity) formData.append("severity", String(metadata.severity))
     }
-    const { ok, data } = await safeFetch("/incidents/upload", {
+    const { ok, data, error, status } = await safeFetch("/incidents/upload", {
       method: "POST",
       body: formData,
     })
-    return ok ? normalizeIncident(data) : null
+    if (!ok) throw new Error(error || "Failed to submit report")
+    if (!data || typeof data !== "object") throw new Error("Invalid server response")
+    return { incident: normalizeIncident(data), status } as ReportSubmissionResult
   },
 
   upvoteIncident: async (incidentId: string) => {

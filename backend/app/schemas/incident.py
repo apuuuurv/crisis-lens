@@ -22,6 +22,7 @@ class IncidentResponse(BaseModel):
     longitude: float
     address: str | None = None
     status: IncidentStatus
+    trust_status: str
     reported_by: int
     created_at: datetime
     

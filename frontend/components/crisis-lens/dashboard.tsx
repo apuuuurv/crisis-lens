@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Map, 
-  FileText, 
-  Truck, 
-  BarChart3, 
+import {
+  Map,
+  FileText,
+  Truck,
+  BarChart3,
   Bell,
-  Plus,
   ChevronLeft,
   ChevronDown,
   ChevronUp,
@@ -19,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
-import { 
+import {
   type Incident,
   type Resource
 } from "@/lib/crisis-data"
@@ -30,7 +29,6 @@ import { ResourceTray } from "./resource-tray"
 import { ReportIncidentDialog } from "./report-incident-dialog"
 import { DispatchDialog } from "./dispatch-dialog"
 
-// Dynamically import Leaflet with SSR: false to prevent hydration mismatches
 const LiveMap = dynamic(() => import("./live-map"), { ssr: false })
 
 type NavItem = "map" | "incidents" | "resources" | "analytics"
@@ -44,7 +42,7 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [resources, setResources] = useState<Resource[]>([])
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [unreadAlerts, setUnreadAlerts] = useState<BackendAlert[]>([])
   const [isResourceTrayOpen, setIsResourceTrayOpen] = useState(true)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -73,7 +71,6 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
           toast.error("Fetch Error")
         }
       } else {
-        // Handled by the page-level guard
         setIsAuthenticated(false)
       }
     }
@@ -83,12 +80,11 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
   // 2. Real-time WebSockets
   useEffect(() => {
     ws.current = new WebSocket("ws://localhost:8000/ws/incidents")
-    
+
     ws.current.onmessage = (event) => {
       const message = JSON.parse(event.data)
       if (message.type === "NEW_INCIDENT") {
         const newIncident = message.data
-        // We'll re-fetch or map the data. Re-fetching is safer for normalization.
         apiClient.getIncidents().then(data => setIncidents(data as Incident[]))
         toast.error(`NEW INCIDENT: ${newIncident.category}`, {
           description: newIncident.title,
@@ -96,8 +92,8 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
         })
       } else if (message.type === "UPDATE_INCIDENT") {
         const updateData = message.data
-        setIncidents(prev => 
-          prev.map(inc => inc.id === updateData.id ? { ...inc, report_count: updateData.report_count } : inc)
+        setIncidents(prev =>
+          prev.map(inc => inc.id === String(updateData.id) ? { ...inc, ...updateData, id: inc.id } : inc)
         )
       }
     }
@@ -123,10 +119,9 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
       const resp = await apiClient.getAlerts()
       const activeAlerts = Array.isArray(resp) ? resp : []
       const unread = activeAlerts.filter(a => !a.is_read)
-      
+
       if (unread.length > unreadAlerts.length) {
         setUnreadAlerts(unread)
-        // ... (toast logic maintained)
       }
     }, 10000)
 
@@ -149,7 +144,7 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
     try {
       const updatedIncident = await apiClient.upvoteIncident(incidentId)
       if (updatedIncident) {
-        setIncidents(prev => 
+        setIncidents(prev =>
           prev.map(inc => inc.id === incidentId ? updatedIncident as Incident : inc)
         )
       }
@@ -160,30 +155,31 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
 
   const handleReportIncident = async (payload: any) => {
     try {
-      let newIncident;
+      let submissionResult
       if (payload instanceof FormData) {
         const latitude = userLocation?.lat || 34.0522
         const longitude = userLocation?.lng || -118.2437
-
         if (!payload.has("latitude")) payload.append("latitude", String(latitude))
         if (!payload.has("longitude")) payload.append("longitude", String(longitude))
-
-        newIncident = await apiClient.reportIncidentWithImage(payload)
+        submissionResult = await apiClient.reportIncidentWithImage(payload)
       } else {
         const finalPayload = {
           ...payload,
           latitude: userLocation?.lat || 34.0522,
           longitude: userLocation?.lng || -118.2437
         }
-        newIncident = await apiClient.reportIncident(finalPayload)
+        submissionResult = await apiClient.reportIncident(finalPayload)
       }
-      
-      if (newIncident) {
-        setIncidents(prev => [newIncident as Incident, ...prev])
+
+      if (submissionResult.status === 201) {
+        setIncidents(prev => [submissionResult.incident as Incident, ...prev])
         toast.success("Incident reported")
+      } else {
+        toast.error("Submission was not accepted")
       }
     } catch (error) {
-      toast.error("Submission failed")
+      const message = error instanceof Error ? error.message : "Submission failed"
+      toast.error(message)
     }
   }
 
@@ -223,13 +219,12 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar Navigation */}
+
       <motion.aside
         initial={{ x: -80 }}
         animate={{ x: 0 }}
         className="flex w-20 flex-col items-center border-r border-border bg-sidebar py-4"
       >
-        {/* Logo */}
         <button
           onClick={onBackToLanding}
           className="mb-8 flex size-12 items-center justify-center rounded-xl bg-emerald/10 transition-colors hover:bg-emerald/20"
@@ -237,7 +232,6 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
           <Shield className="size-6 text-emerald" />
         </button>
 
-        {/* Nav Items */}
         <nav className="flex flex-1 flex-col gap-2">
           {navItems.map((item) => (
             <motion.button
@@ -252,7 +246,6 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
               }`}
             >
               <item.icon className="size-5" />
-              {/* Tooltip */}
               <span className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100 md:block">
                 {item.label}
               </span>
@@ -260,9 +253,7 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
           ))}
         </nav>
 
-        {/* Bottom Actions */}
         <div className="mt-auto flex flex-col gap-2">
-          {/* Alert Badge */}
           <button
             onClick={triggerGeofenceAlert}
             className="group relative flex size-12 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
@@ -278,7 +269,6 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
             </span>
           </button>
 
-          {/* Manual Log (Admin) */}
           <button
             onClick={() => setReportDialogOpen(true)}
             className="group relative flex size-12 items-center justify-center rounded-xl bg-emerald text-primary-foreground transition-colors hover:bg-emerald/90"
@@ -292,12 +282,14 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
       </motion.aside>
 
       {/* Main Content Area */}
+      {/* FIX (Task 3): overflow-hidden here ensures the header + content stay contained */}
       <div className="flex flex-1 flex-col overflow-hidden">
+
         {/* Top Bar */}
         <motion.header
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="flex h-16 items-center justify-between border-b border-border bg-card/50 px-6 backdrop-blur-xl"
+          className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card/50 px-6 backdrop-blur-xl"
         >
           <div className="flex items-center gap-4">
             <Button
@@ -331,8 +323,10 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
         </motion.header>
 
         {/* Content Grid */}
+        {/* FIX (Task 3): overflow-hidden so inner areas scroll independently, not the whole page */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Main Map/Content Area */}
+
+          {/* Main Map/Content + Resource Tray column */}
           <div className="flex flex-1 flex-col overflow-hidden">
             <AnimatePresence mode="wait">
               {activeNav === "map" && (
@@ -341,10 +335,11 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="flex-1 p-4"
+                  // FIX (Task 3): flex-1 + overflow-hidden keeps the map from expanding page height
+                  className="flex-1 overflow-hidden p-4"
                 >
-                  <LiveMap 
-                    incidents={incidents} 
+                  <LiveMap
+                    incidents={incidents}
                     resources={resources.filter(r => r.status === "Dispatched")}
                     onIncidentClick={handleOpenDispatch}
                   />
@@ -358,8 +353,8 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
                   exit={{ opacity: 0 }}
                   className="flex-1 overflow-hidden p-4"
                 >
-                  <IncidentLogView 
-                    incidents={incidents} 
+                  <IncidentLogView
+                    incidents={incidents}
                     onUpvote={handleUpvote}
                     onDispatch={handleOpenDispatch}
                   />
@@ -390,7 +385,8 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
             </AnimatePresence>
 
             {/* Resource Tray */}
-            <div className="border-t border-border">
+            {/* FIX (Task 3): shrink-0 so the tray never steals height from the map above */}
+            <div className="shrink-0 border-t border-border">
               <button
                 onClick={() => setIsResourceTrayOpen(!isResourceTrayOpen)}
                 className="flex w-full items-center justify-between bg-card/50 px-4 py-2 text-sm text-muted-foreground backdrop-blur-xl transition-colors hover:text-foreground"
@@ -420,21 +416,79 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
             </div>
           </div>
 
-          {/* Right Sidebar - Crisis Feed */}
-          <aside className="hidden w-80 flex-col border-l border-border bg-card/30 backdrop-blur-xl lg:flex">
-            <div className="flex items-center justify-between border-b border-border p-4">
+          {/* ─── Right Sidebar — Real-time Feed ─────────────────────────────── */}
+          {/*
+            FIXES applied here:
+            Task 1: overflow-hidden on the aside so it never grows the page.
+                    The inner scroll container uses overflow-y-auto + custom scrollbar.
+            Task 2: incidents.length drives the badge count and updates reactively
+                    whenever setIncidents() is called (WS or initial fetch).
+            Task 3: The aside is a fixed-width, full-height column. Its scroll is
+                    completely independent of the map on the left.
+            Task 4: Cards inside CrisisFeed get w-full min-w-0 so they never squeeze
+                    when the scrollbar appears (see comment inside scroll div).
+          */}
+          <aside className="hidden w-80 shrink-0 flex-col border-l border-border bg-card/30 backdrop-blur-xl lg:flex overflow-hidden">
+
+            {/* Sticky header — never scrolls away */}
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <h2 className="font-semibold text-foreground">Real-time Feed</h2>
-              <Badge variant="secondary" className="text-xs">
-                {incidents.length} Reports
+              {/* FIX (Task 2): incidents.length is the live source of truth.
+                  React re-renders this whenever setIncidents() fires — on mount,
+                  on WS NEW_INCIDENT, and on WS UPDATE_INCIDENT. */}
+              <Badge variant="secondary" className="text-xs tabular-nums">
+                {incidents.length} {incidents.length === 1 ? "Report" : "Reports"}
               </Badge>
             </div>
-            <ScrollArea className="flex-1">
-              <CrisisFeed 
-                incidents={incidents} 
-                onUpvote={handleUpvote}
-                onDispatch={handleOpenDispatch}
-              />
-            </ScrollArea>
+
+            {/*
+              FIX (Task 1 & 3): This div is the ONLY scrollable element.
+              - h-0 + flex-1 forces it to fill remaining sidebar height exactly,
+                never overflowing the viewport.
+              - overflow-y-auto shows a scrollbar only when content exceeds height.
+              - The custom scrollbar CSS below makes it thin and subtle.
+              FIX (Task 4): The inner wrapper uses w-full so cards never squeeze.
+            */}
+            <div
+              className="flex-1 h-0 overflow-y-auto"
+              style={{
+                // Thin, subtle custom scrollbar — works in Chrome/Edge/Safari
+                scrollbarWidth: "thin",           /* Firefox */
+                scrollbarColor: "hsl(var(--border)) transparent", /* Firefox thumb / track */
+              }}
+            >
+              {/* Webkit scrollbar (Chrome / Safari / Edge) injected via a style tag.
+                  We can't use Tailwind for ::-webkit-scrollbar pseudo-elements,
+                  so a scoped <style> block is the cleanest approach here. */}
+              <style>{`
+                .crisis-feed-scroll::-webkit-scrollbar {
+                  width: 4px;
+                }
+                .crisis-feed-scroll::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                .crisis-feed-scroll::-webkit-scrollbar-thumb {
+                  background-color: hsl(var(--border));
+                  border-radius: 999px;
+                }
+                .crisis-feed-scroll::-webkit-scrollbar-thumb:hover {
+                  background-color: hsl(var(--muted-foreground) / 0.5);
+                }
+              `}</style>
+
+              {/*
+                FIX (Task 4): w-full + min-w-0 on this wrapper ensures CrisisFeed cards
+                don't overflow or squeeze when the 4px scrollbar appears. The scrollbar
+                sits inside the 320px column width, so cards must be allowed to shrink.
+              */}
+              <div className="w-full min-w-0 crisis-feed-scroll">
+                <CrisisFeed
+                  incidents={incidents}
+                  onUpvote={handleUpvote}
+                  onDispatch={handleOpenDispatch}
+                />
+              </div>
+            </div>
           </aside>
         </div>
       </div>
@@ -456,38 +510,43 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
   )
 }
 
-// Incident Log View Component
-function IncidentLogView({ 
-  incidents, 
+// ─── Incident Log View ──────────────────────────────────────────────────────
+
+function IncidentLogView({
+  incidents,
   onUpvote,
-  onDispatch 
-}: { 
+  onDispatch
+}: {
   incidents: Incident[]
   onUpvote: (id: string) => void
   onDispatch: (incident: Incident) => void
 }) {
   return (
-    <div className="h-full rounded-xl border border-border bg-card/50 backdrop-blur-xl">
-      <div className="border-b border-border p-4">
+    <div className="h-full rounded-xl border border-border bg-card/50 backdrop-blur-xl flex flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-border p-4">
         <h2 className="font-semibold text-foreground">All Incidents</h2>
         <p className="text-sm text-muted-foreground">Complete log of reported incidents</p>
       </div>
-      <ScrollArea className="h-[calc(100%-80px)]">
-        <div className="p-4">
-          <CrisisFeed 
-            incidents={incidents} 
-            onUpvote={onUpvote}
-            onDispatch={onDispatch}
-            compact={false}
-          />
-        </div>
-      </ScrollArea>
+      {/* FIX: explicit h-0 + flex-1 prevents ScrollArea from collapsing */}
+      <div className="flex-1 h-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 w-full min-w-0">
+            <CrisisFeed
+              incidents={incidents}
+              onUpvote={onUpvote}
+              onDispatch={onDispatch}
+              compact={false}
+            />
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   )
 }
 
-// Resource View Component
-function ResourceView({ resources, incidents }: { resources: Resource[], incidents: Incident[] }) {
+// ─── Resource View ──────────────────────────────────────────────────────────
+
+function ResourceView({ resources, incidents }: { resources: Resource[]; incidents: Incident[] }) {
   const groupedResources = {
     Available: resources.filter(r => r.status === "Available"),
     Dispatched: resources.filter(r => r.status === "Dispatched"),
@@ -497,57 +556,60 @@ function ResourceView({ resources, incidents }: { resources: Resource[], inciden
   return (
     <div className="grid h-full gap-4 md:grid-cols-3">
       {Object.entries(groupedResources).map(([status, resourceList]) => (
-        <div key={status} className="rounded-xl border border-border bg-card/50 backdrop-blur-xl">
-          <div className="border-b border-border p-4">
+        <div key={status} className="rounded-xl border border-border bg-card/50 backdrop-blur-xl flex flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-border p-4">
             <div className="flex items-center gap-2">
               <span className={`size-2 rounded-full ${
-                status === "Available" ? "bg-emerald" : 
+                status === "Available" ? "bg-emerald" :
                 status === "Dispatched" ? "bg-amber" : "bg-blue-400"
               }`} />
               <h3 className="font-semibold text-foreground">{status}</h3>
               <Badge variant="secondary" className="ml-auto">{resourceList.length}</Badge>
             </div>
           </div>
-          <ScrollArea className="h-[calc(100%-60px)]">
-            <div className="space-y-2 p-4">
-              {resourceList.map(resource => {
-                const assignedIncident = incidents.find(i => i.id === resource.assigned_incident_id)
-                return (
-                  <motion.div
-                    key={resource.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-lg border border-border bg-card p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{
-                        resource.type === "Ambulance" ? "🚑" :
-                        resource.type === "Fire Truck" ? "🚒" :
-                        resource.type === "Police" ? "🚔" :
-                        resource.type === "Rescue" ? "🛟" : "🚁"
-                      }</span>
-                      <div>
-                        <p className="font-medium text-foreground">{resource.unit_name}</p>
-                        <p className="text-xs text-muted-foreground">{resource.type}</p>
+          <div className="flex-1 h-0">
+            <ScrollArea className="h-full">
+              <div className="space-y-2 p-4">
+                {resourceList.map(resource => {
+                  const assignedIncident = incidents.find(i => i.id === resource.assigned_incident_id)
+                  return (
+                    <motion.div
+                      key={resource.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-lg border border-border bg-card p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{
+                          resource.type === "Ambulance" ? "🚑" :
+                          resource.type === "Fire Truck" ? "🚒" :
+                          resource.type === "Police" ? "🚔" :
+                          resource.type === "Rescue" ? "🛟" : "🚁"
+                        }</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">{resource.unit_name}</p>
+                          <p className="text-xs text-muted-foreground">{resource.type}</p>
+                        </div>
                       </div>
-                    </div>
-                    {assignedIncident && (
-                      <p className="mt-2 truncate text-xs text-amber">
-                        → {assignedIncident.title}
-                      </p>
-                    )}
-                  </motion.div>
-                )
-              })}
-            </div>
-          </ScrollArea>
+                      {assignedIncident && (
+                        <p className="mt-2 truncate text-xs text-amber">
+                          → {assignedIncident.title}
+                        </p>
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </ScrollArea>
+          </div>
         </div>
       ))}
     </div>
   )
 }
 
-// Analytics View Component
+// ─── Analytics View ─────────────────────────────────────────────────────────
+
 function AnalyticsView({ incidents }: { incidents: Incident[] }) {
   const categoryCount = incidents.reduce((acc, inc) => {
     acc[inc.category] = (acc[inc.category] || 0) + 1
@@ -559,22 +621,19 @@ function AnalyticsView({ incidents }: { incidents: Incident[] }) {
     return acc
   }, {} as Record<string, number>)
 
-  const avgSeverity = (incidents.reduce((sum, inc) => sum + (inc.severity || 0), 0) / (incidents.length || 1)).toFixed(1)
+  const avgSeverity = (
+    incidents.reduce((sum, inc) => sum + (inc.severity || 0), 0) / (incidents.length || 1)
+  ).toFixed(1)
 
   return (
-    <div className="grid h-full gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid h-full gap-4 md:grid-cols-2 lg:grid-cols-3 overflow-y-auto">
       {/* Severity Overview */}
       <div className="rounded-xl border border-border bg-card/50 p-6 backdrop-blur-xl">
         <h3 className="mb-4 font-semibold text-foreground">Severity Overview</h3>
         <div className="flex items-center justify-center">
           <div className="relative flex size-32 items-center justify-center">
             <svg className="size-full -rotate-90">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                className="fill-none stroke-muted stroke-[8]"
-              />
+              <circle cx="64" cy="64" r="56" className="fill-none stroke-muted stroke-[8]" />
               <motion.circle
                 cx="64"
                 cy="64"
@@ -644,7 +703,7 @@ function AnalyticsView({ incidents }: { incidents: Incident[] }) {
         </div>
       </div>
 
-      {/* Risk Heatmap Placeholder */}
+      {/* 24h Timeline */}
       <div className="rounded-xl border border-border bg-card/50 p-6 backdrop-blur-xl md:col-span-2 lg:col-span-3">
         <h3 className="mb-4 font-semibold text-foreground">24h Incident Timeline</h3>
         <div className="flex h-24 items-end gap-1">

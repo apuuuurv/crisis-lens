@@ -12,7 +12,5 @@ email-validator==2.3.0
 Pillow==12.1.1
 psycopg2-binary==2.9.11
 numpy==2.4.2
-scipy==1.17.0
 scikit-learn==1.8.0
 google-genai==1.70.0
-
