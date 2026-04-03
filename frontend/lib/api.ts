@@ -40,38 +40,48 @@ export interface BackendAlert {
   created_at: string
 }
 
-// Guest Credentials for Auto-Login
-const GUEST_CREDENTIALS = {
-  name: "Guest User",
-  email: "guest@crisis.lens",
-  password: "guestPassword123",
-  role: "citizen"
-}
+// Removed Guest Credentials for Secure Auth
 
 // Internal Request Wrapper for Auth + Error Handling
 async function safeFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  
   const headers: Record<string, string> = {
     ...Object.fromEntries(Object.entries(options.headers || {}) as [string, string][]),
-    "Authorization": token ? `Bearer ${token}` : "",
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
   }
 
   if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json"
+    if (options.body instanceof URLSearchParams) {
+      headers["Content-Type"] = "application/x-www-form-urlencoded"
+    } else {
+      headers["Content-Type"] = "application/json"
+    }
   }
 
   try {
     const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+    
+    if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
+       // Token expired or invalid, redirect to login
+       localStorage.removeItem("token")
+       window.location.href = "/login"
+       return { ok: false, status: 401, data: null }
+    }
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}))
       console.error(`API Error [${res.status}]:`, errorData.detail || "Unknown error")
-      return { ok: false, status: res.status, data: null }
+      return { ok: false, status: res.status, data: null, error: errorData.detail }
     }
     const data = await res.json()
     return { ok: true, status: res.status, data }
   } catch (error) {
     console.error("Network Error:", error)
-    return { ok: false, status: 0, data: null }
+    return { ok: false, status: 503, data: null, error: "Backend Offline" }
   }
 }
 
@@ -98,39 +108,49 @@ export const normalizeResource = (res: BackendResource): Resource => ({
 })
 
 export const apiClient = {
-  initAuth: async () => {
-    // 1. Try to login
+  login: async (email: string, password: string) => {
     const loginData = new URLSearchParams()
-    loginData.append("username", GUEST_CREDENTIALS.email)
-    loginData.append("password", GUEST_CREDENTIALS.password)
+    loginData.append("username", email)
+    loginData.append("password", password)
 
-    let res = await fetch(`${BASE_URL}/auth/login`, {
+    const { ok, data, error } = await safeFetch("/auth/login", {
       method: "POST",
       body: loginData,
     })
 
-    if (res.status === 401) {
-      // 2. If login fails, try to register
-      console.log("Guest missing. Registering...")
-      await fetch(`${BASE_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(GUEST_CREDENTIALS),
-      })
-
-      // 3. Try to login again
-      res = await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        body: loginData,
-      })
+    if (ok && data?.access_token) {
+      localStorage.setItem("token", data.access_token)
+      localStorage.setItem("role", data.role || "citizen")
+      return { ok: true, data }
     }
+    return { ok: false, error: error || "Login failed" }
+  },
 
-    if (res.ok) {
-      const { access_token } = await res.json()
-      localStorage.setItem("token", access_token)
-      return true
-    }
-    return false
+  register: async (userData: any) => {
+    const { ok, data, error } = await safeFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(userData),
+    })
+    return { ok, data, error }
+  },
+
+  logout: () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("role")
+    window.location.href = "/login"
+  },
+
+  isAuthenticated: () => {
+    if (typeof window === "undefined") return false
+    const token = localStorage.getItem("token")
+    return !!token && token !== "null" && token !== "undefined"
+  },
+
+  getRole: () => {
+    if (typeof window === "undefined") return null
+    const role = localStorage.getItem("role")
+    if (!role || role === "null" || role === "undefined") return null
+    return role
   },
 
   getIncidents: async () => {

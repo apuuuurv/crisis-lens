@@ -105,7 +105,7 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
     user_role = user.role.value if hasattr(user.role, "value") else user.role
     access_token = create_access_token(data={"sub": str(user.id), "role": user_role})
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "role": user_role}
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):

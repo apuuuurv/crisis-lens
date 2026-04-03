@@ -56,8 +56,10 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
   // 1. Authentication & Initial Fetching
   useEffect(() => {
     const init = async () => {
-      const authSuccess = await apiClient.initAuth()
-      if (authSuccess) {
+      const isAuth = apiClient.isAuthenticated()
+      const role = apiClient.getRole()
+
+      if (isAuth && role === "admin") {
         setIsAuthenticated(true)
         try {
           const [fetchedIncidents, fetchedResources] = await Promise.all([
@@ -71,7 +73,8 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
           toast.error("Fetch Error")
         }
       } else {
-        toast.error("Auth Fail", { description: "Mission control offline." })
+        // Handled by the page-level guard
+        setIsAuthenticated(false)
       }
     }
     init()

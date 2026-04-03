@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 # 1. FORCE load the environment variables first!
 load_dotenv()
 
-# 2. Get the URL (it will now correctly see the Supabase URL)
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+# 2. Get the URL with a local SQLite fallback for easier development
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./disaster_network.db")
 
 # Debug print: This will show in your terminal when you start the server
 # It helps you confirm you aren't accidentally using SQLite.
