@@ -173,7 +173,22 @@ export const apiClient = {
     return ok ? normalizeIncident(data) : null
   },
 
-  reportIncidentWithImage: async (formData: FormData) => {
+  reportIncidentWithImage: async (formData: FormData, metadata?: { 
+    latitude?: number; 
+    longitude?: number; 
+    title?: string;
+    description?: string;
+    category?: string;
+    severity?: number;
+  }) => {
+    if (metadata) {
+      if (metadata.latitude) formData.append("latitude", String(metadata.latitude))
+      if (metadata.longitude) formData.append("longitude", String(metadata.longitude))
+      if (metadata.title) formData.append("title", metadata.title)
+      if (metadata.description) formData.append("description", metadata.description)
+      if (metadata.category) formData.append("category", metadata.category)
+      if (metadata.severity) formData.append("severity", String(metadata.severity))
+    }
     const { ok, data } = await safeFetch("/incidents/upload", {
       method: "POST",
       body: formData,

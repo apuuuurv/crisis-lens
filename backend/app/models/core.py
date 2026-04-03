@@ -47,7 +47,8 @@ class Incident(Base):
     title = Column(String, index=True)
     description = Column(String)
     category = Column(String, index=True) # e.g., Fire, Flood, Earthquake
-    severity = Column(Integer) # e.g., 1 to 10
+    severity = Column(Integer, nullable=True) # e.g., 1 to 10
+    report_count = Column(Integer, default=1)
     latitude = Column(Float)
     longitude = Column(Float)
     address = Column(String, nullable=True)

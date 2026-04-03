@@ -6,7 +6,7 @@ class IncidentCreate(BaseModel):
     title: str
     description: str
     category: str
-    severity: int
+    severity: int | None = None
     latitude: float
     longitude: float
     address: str | None = None
@@ -16,7 +16,8 @@ class IncidentResponse(BaseModel):
     title: str
     description: str
     category: str
-    severity: int
+    severity: int | None = None
+    report_count: int
     latitude: float
     longitude: float
     address: str | None = None

@@ -94,6 +94,11 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
           description: newIncident.title,
           duration: 5000,
         })
+      } else if (message.type === "UPDATE_INCIDENT") {
+        const updateData = message.data
+        setIncidents(prev => 
+          prev.map(inc => inc.id === updateData.id ? { ...inc, report_count: updateData.report_count } : inc)
+        )
       }
     }
 
@@ -548,7 +553,7 @@ function AnalyticsView({ incidents }: { incidents: Incident[] }) {
     return acc
   }, {} as Record<string, number>)
 
-  const avgSeverity = (incidents.reduce((sum, inc) => sum + inc.severity, 0) / incidents.length).toFixed(1)
+  const avgSeverity = (incidents.reduce((sum, inc) => sum + (inc.severity || 0), 0) / (incidents.length || 1)).toFixed(1)
 
   return (
     <div className="grid h-full gap-4 md:grid-cols-2 lg:grid-cols-3">

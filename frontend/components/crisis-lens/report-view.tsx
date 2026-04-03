@@ -41,7 +41,6 @@ export function ReportView() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState<IncidentCategory>("Fire")
-  const [severity, setSeverity] = useState([5])
   const [location, setLocation] = useState<[number, number] | null>(null)
   const [address, setAddress] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
@@ -114,13 +113,18 @@ export function ReportView() {
       if (uploadedFiles.length > 0) {
         const formData = new FormData()
         formData.append("file", uploadedFiles[0])
-        result = await apiClient.reportIncidentWithImage(formData)
+        result = await apiClient.reportIncidentWithImage(formData, {
+          latitude: location[0],
+          longitude: location[1],
+          title: title,
+          description: description,
+          category: category
+        })
       } else {
         result = await apiClient.reportIncident({
           title,
           description,
           category,
-          severity: severity[0],
           latitude: location[0],
           longitude: location[1],
           address: address
@@ -267,7 +271,7 @@ export function ReportView() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Category</Label>
                   <Select value={category} onValueChange={(v: any) => setCategory(v)}>
@@ -280,16 +284,6 @@ export function ReportView() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Severity: {severity[0]}/10</Label>
-                  <Slider 
-                    value={severity} 
-                    onValueChange={setSeverity} 
-                    max={10} 
-                    step={1} 
-                    className="py-4"
-                  />
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 from fastapi import UploadFile, File, APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from typing import List
 
 from app.api.websocket_routes import manager
@@ -16,11 +17,43 @@ from app.utils.geo import calculate_distance_km
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
 @router.post("/", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
-def report_incident(
+async def report_incident(
     incident: IncidentCreate, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(allow_any_user) # Any logged-in user can report
 ):
+    # 1. Deduplication Logic: Check for existing incidents (same category, 500m radius, last 2 hours)
+    from datetime import timezone
+    time_window = datetime.now(timezone.utc) - timedelta(hours=2)
+    nearby_incidents = db.query(Incident).filter(
+        Incident.category == incident.category,
+        Incident.created_at >= time_window
+    ).all()
+
+    match = None
+    for ex in nearby_incidents:
+        dist = calculate_distance_km(incident.latitude, incident.longitude, ex.latitude, ex.longitude)
+        if dist <= 0.5: # 500 meters
+            match = ex
+            break
+
+    if match:
+        match.report_count += 1
+        db.commit()
+        db.refresh(match)
+        
+        # Real-time update for existing incident
+        broadcast_data = {
+            "type": "UPDATE_INCIDENT",
+            "data": {
+                "id": match.id,
+                "report_count": match.report_count
+            }
+        }
+        await manager.broadcast_incident(broadcast_data)
+        return match
+
+    # 2. No match found, create new incident
     new_incident = Incident(
         title=incident.title,
         description=incident.description,
@@ -61,6 +94,22 @@ def report_incident(
         db.commit()
     # -----------------------------
 
+    # New Incident Broadcast
+    broadcast_data = {
+        "type": "NEW_INCIDENT",
+        "data": {
+            "id": new_incident.id,
+            "title": new_incident.title,
+            "category": new_incident.category,
+            "report_count": new_incident.report_count,
+            "latitude": new_incident.latitude,
+            "longitude": new_incident.longitude
+        }
+    }
+    await manager.broadcast_incident(broadcast_data)
+
+    return new_incident
+
     return new_incident
 
 @router.get("/", response_model=List[IncidentResponse])
@@ -71,22 +120,70 @@ def get_all_incidents(
     incidents = db.query(Incident).all()
     return incidents
 
+from fastapi import UploadFile, File, APIRouter, Depends, HTTPException, status, Form
+
 @router.post("/upload", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
 async def report_incident_via_image(
     file: UploadFile = File(...),
+    latitude: float = Form(None),
+    longitude: float = Form(None),
+    title: str = Form(None),
+    description: str = Form(None),
+    category: str = Form(None),
+    severity: int = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(allow_any_user)
 ):
     image_bytes = await file.read()
     extracted_data = extract_image_data(image_bytes)
 
+    # Use manual inputs if provided, otherwise fallback to AI/EXIF extraction
+    final_lat = latitude if latitude is not None else extracted_data["latitude"]
+    final_lng = longitude if longitude is not None else extracted_data["longitude"]
+    final_title = title if title else extracted_data["title"]
+    final_desc = description if description else extracted_data["description"]
+    final_cat = category if category else extracted_data["category"]
+    final_sev = severity if severity is not None else extracted_data["severity"]
+
+    # 1. Deduplication Logic: Check for existing incidents (same category, 500m radius, last 2 hours)
+    from datetime import timezone
+    time_window = datetime.now(timezone.utc) - timedelta(hours=2)
+    nearby_incidents = db.query(Incident).filter(
+        Incident.category == final_cat,
+        Incident.created_at >= time_window
+    ).all()
+
+    match = None
+    for ex in nearby_incidents:
+        dist = calculate_distance_km(final_lat, final_lng, ex.latitude, ex.longitude)
+        if dist <= 0.5: # 500 meters
+            match = ex
+            break
+
+    if match:
+        match.report_count += 1
+        db.commit()
+        db.refresh(match)
+        
+        # Real-time update for existing incident
+        broadcast_data = {
+            "type": "UPDATE_INCIDENT",
+            "data": {
+                "id": match.id,
+                "report_count": match.report_count
+            }
+        }
+        await manager.broadcast_incident(broadcast_data)
+        return match
+
+    # 2. No match found, create new incident
     new_incident = Incident(
-        title=extracted_data["title"],
-        description=extracted_data["description"],
-        category=extracted_data["category"],
-        severity=extracted_data["severity"],
-        latitude=extracted_data["latitude"],
-        longitude=extracted_data["longitude"],
+        title=final_title,
+        description=final_desc,
+        category=final_cat,
+        severity=final_sev,
+        latitude=final_lat,
+        longitude=final_lng,
         reported_by=current_user.id
     )
 
@@ -96,7 +193,6 @@ async def report_incident_via_image(
 
     # --- GEOFENCE ALERT LOGIC ---
     DANGER_RADIUS_KM = 5.0
-
     all_users = db.query(User).all()
     alerts_to_create = []
 
@@ -120,14 +216,14 @@ async def report_incident_via_image(
         db.commit()
     # -----------------------------
 
-    # WebSocket Broadcast
+    # WebSocket Broadcast for new incident
     broadcast_data = {
         "type": "NEW_INCIDENT",
         "data": {
             "id": new_incident.id,
             "title": new_incident.title,
             "category": new_incident.category,
-            "severity": new_incident.severity,
+            "report_count": new_incident.report_count,
             "latitude": new_incident.latitude,
             "longitude": new_incident.longitude
         }

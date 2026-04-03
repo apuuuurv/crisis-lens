@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Incident, Resource } from "@/lib/crisis-data"
-import { categoryColors, getSeverityColor } from "@/lib/crisis-data"
+import { categoryColors, getHeatColor } from "@/lib/crisis-data"
 
 interface DispatchDialogProps {
   open: boolean
@@ -82,21 +82,21 @@ export function DispatchDialog({
               {incident.category}
             </Badge>
             <span className={`text-sm font-bold ${
-              incident.severity >= 8 ? "text-rose" :
-              incident.severity >= 5 ? "text-amber" : "text-emerald"
+              incident.report_count >= 10 ? "text-rose" :
+              incident.report_count >= 5 ? "text-amber" : "text-emerald"
             }`}>
-              Severity: {incident.severity}/10
+              Reports: {incident.report_count}
             </span>
           </div>
           <h3 className="mb-1 font-semibold text-foreground">{incident.title}</h3>
           <p className="text-sm text-muted-foreground">{incident.description}</p>
           
-          {/* Severity bar */}
+          {/* Report Volume bar */}
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
             <motion.div
-              className={`h-full ${getSeverityColor(incident.severity)}`}
+              className={`h-full ${getHeatColor(incident.report_count)}`}
               initial={{ width: 0 }}
-              animate={{ width: `${incident.severity * 10}%` }}
+              animate={{ width: `${Math.min((incident.report_count / 10) * 100, 100)}%` }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             />
           </div>

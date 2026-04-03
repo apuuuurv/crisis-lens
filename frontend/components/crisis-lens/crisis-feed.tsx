@@ -8,7 +8,7 @@ import type { Incident } from "@/lib/crisis-data"
 import { 
   categoryColors, 
   statusColors, 
-  getSeverityColor, 
+  getHeatColor, 
   formatTimeAgo 
 } from "@/lib/crisis-data"
 
@@ -79,22 +79,22 @@ export function CrisisFeed({
             </div>
           </div>
 
-          {/* Severity Meter */}
+          {/* Heat Meter (Report Volume) */}
           <div className="mb-3">
             <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Severity</span>
+              <span className="text-muted-foreground">Report Volume</span>
               <span className={`font-semibold ${
-                incident.severity >= 8 ? "text-rose" :
-                incident.severity >= 5 ? "text-amber" : "text-emerald"
+                incident.report_count >= 10 ? "text-rose" :
+                incident.report_count >= 5 ? "text-amber" : "text-emerald"
               }`}>
-                {incident.severity}/10
+                {incident.report_count} {incident.report_count === 1 ? 'Report' : 'Reports'}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <motion.div
-                className={`h-full ${getSeverityColor(incident.severity)}`}
+                className={`h-full ${getHeatColor(incident.report_count)}`}
                 initial={{ width: 0 }}
-                animate={{ width: `${incident.severity * 10}%` }}
+                animate={{ width: `${Math.min((incident.report_count / 10) * 100, 100)}%` }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               />
             </div>

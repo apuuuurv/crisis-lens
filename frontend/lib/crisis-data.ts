@@ -8,7 +8,8 @@ export interface Incident {
   title: string
   description: string
   category: IncidentCategory
-  severity: number
+  severity?: number
+  report_count: number
   status: IncidentStatus
   upvotes: number
   is_verified: boolean
@@ -43,7 +44,7 @@ export const mockIncidents: Incident[] = [
     title: "Warehouse Fire - Industrial District",
     description: "Large fire reported at the abandoned warehouse on 5th and Main. Multiple witnesses confirm heavy smoke.",
     category: "Fire",
-    severity: 8,
+    report_count: 15,
     status: "Active",
     upvotes: 24,
     is_verified: true,
@@ -55,7 +56,7 @@ export const mockIncidents: Incident[] = [
     title: "Flash Flooding - Riverside Area",
     description: "Water levels rising rapidly near the riverbank. Several vehicles stranded.",
     category: "Flood",
-    severity: 7,
+    report_count: 8,
     status: "Active",
     upvotes: 18,
     is_verified: true,
@@ -67,7 +68,7 @@ export const mockIncidents: Incident[] = [
     title: "Gas Leak - Downtown",
     description: "Strong gas smell reported near the shopping center. Area being evacuated.",
     category: "Chemical",
-    severity: 9,
+    report_count: 3,
     status: "Verifying",
     upvotes: 12,
     is_verified: false,
@@ -79,7 +80,7 @@ export const mockIncidents: Incident[] = [
     title: "Multi-Vehicle Accident - Highway 101",
     description: "Major collision involving 4 vehicles. Multiple injuries reported.",
     category: "Medical",
-    severity: 6,
+    report_count: 5,
     status: "Active",
     upvotes: 31,
     is_verified: true,
@@ -91,7 +92,7 @@ export const mockIncidents: Incident[] = [
     title: "Building Collapse - Construction Site",
     description: "Partial structure collapse at new development. Workers may be trapped.",
     category: "Earthquake",
-    severity: 10,
+    report_count: 12,
     status: "Active",
     upvotes: 45,
     is_verified: true,
@@ -103,7 +104,7 @@ export const mockIncidents: Incident[] = [
     title: "Power Lines Down - Suburban Area",
     description: "Storm damage has downed power lines. Risk of electrical hazard.",
     category: "Storm",
-    severity: 5,
+    report_count: 4,
     status: "Reported",
     upvotes: 8,
     is_verified: false,
@@ -166,9 +167,9 @@ export const resourceTypeIcons: Record<ResourceType, string> = {
   Helicopter: "🚁",
 }
 
-export function getSeverityColor(severity: number): string {
-  if (severity >= 8) return "bg-rose"
-  if (severity >= 5) return "bg-amber"
+export function getHeatColor(count: number): string {
+  if (count >= 10) return "bg-rose"
+  if (count >= 5) return "bg-amber"
   return "bg-emerald"
 }
 

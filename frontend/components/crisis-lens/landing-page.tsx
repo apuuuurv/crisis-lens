@@ -15,17 +15,28 @@ import {
   MessageSquare
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { apiClient } from "@/lib/api"
 
 interface LandingPageProps {
   // Props no longer needed for routing but kept for interface consistency if needed elsewhere
 }
 
 export function LandingPage({}: LandingPageProps) {
+  const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
+  const [isAuth, setIsAuth] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
+    setIsAuth(apiClient.isAuthenticated())
   }, [])
+
+  const handleLogout = () => {
+    apiClient.logout()
+    setIsAuth(false)
+    router.refresh()
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -73,6 +84,27 @@ export function LandingPage({}: LandingPageProps) {
           }}
         />
       </div>
+
+      {/* Top Navigation */}
+      <nav className="absolute top-0 right-0 z-[100] p-6 flex gap-4">
+        {isMounted && (
+          isAuth ? (
+            <Button 
+              variant="ghost" 
+              onClick={handleLogout}
+              className="text-zinc-400 hover:text-red-400 transition-colors"
+            >
+              Sign Out
+            </Button>
+          ) : (
+            <Link href="/login">
+              <Button variant="ghost" className="text-zinc-400 hover:text-emerald transition-colors">
+                Sign In
+              </Button>
+            </Link>
+          )
+        )}
+      </nav>
 
       {/* Main Content */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
@@ -124,47 +156,74 @@ export function LandingPage({}: LandingPageProps) {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-col gap-4 sm:flex-row sm:gap-6"
         >
-          <Link href="/report">
-            <Button
-              size="lg"
-              className="group relative h-14 w-full overflow-hidden rounded-xl bg-emerald px-8 text-lg font-semibold text-primary-foreground shadow-lg shadow-emerald/25 transition-all hover:bg-emerald/90 hover:shadow-xl hover:shadow-emerald/30 sm:w-auto"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                Report Incident
-                <motion.span
-                  animate={{ x: [0, 4, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <AlertTriangle className="size-5" />
-                </motion.span>
-              </span>
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-emerald via-primary via-50% to-emerald"
-                animate={{
-                  x: ["-100%", "100%"],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "linear",
-                }}
-                style={{ opacity: 0.3 }}
-              />
-            </Button>
-          </Link>
+          {isMounted && (
+            isAuth ? (
+              <>
+                <Link href="/report">
+                  <Button
+                    size="lg"
+                    className="group relative h-14 w-full overflow-hidden rounded-xl bg-emerald px-8 text-lg font-semibold text-primary-foreground shadow-lg shadow-emerald/25 transition-all hover:bg-emerald/90 hover:shadow-xl hover:shadow-emerald/30 sm:w-auto"
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      Report Incident
+                      <motion.span
+                        animate={{ x: [0, 4, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
+                        <AlertTriangle className="size-5" />
+                      </motion.span>
+                    </span>
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-emerald via-primary via-50% to-emerald"
+                      animate={{
+                        x: ["-100%", "100%"],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      style={{ opacity: 0.3 }}
+                    />
+                  </Button>
+                </Link>
 
-          <Link href="/dashboard">
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-14 w-full rounded-xl border-emerald/50 bg-emerald/5 px-8 text-lg font-semibold text-emerald transition-all hover:bg-emerald/10 sm:w-auto"
-            >
-              <span className="flex items-center gap-2">
-                Command Center
-                <Zap className="size-5" />
-              </span>
-            </Button>
-          </Link>
+                <Link href="/dashboard">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 w-full rounded-xl border-emerald/50 bg-emerald/5 px-8 text-lg font-semibold text-emerald transition-all hover:bg-emerald/10 sm:w-auto"
+                  >
+                    <span className="flex items-center gap-2">
+                      Command Center
+                      <Zap className="size-5" />
+                    </span>
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button
+                    size="lg"
+                    className="group relative h-14 w-full overflow-hidden rounded-xl bg-emerald px-8 text-lg font-semibold text-primary-foreground shadow-lg shadow-emerald/25 transition-all hover:bg-emerald/90 hover:shadow-xl hover:shadow-emerald/30 sm:w-auto"
+                  >
+                    Sign In / Get Started
+                  </Button>
+                </Link>
+
+                <Link href="/register">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 w-full rounded-xl border-emerald/50 bg-emerald/5 px-8 text-lg font-semibold text-emerald transition-all hover:bg-emerald/10 sm:w-auto"
+                  >
+                    Create Account
+                  </Button>
+                </Link>
+              </>
+            )
+          )}
         </motion.div>
 
         {/* Stats Row */}
