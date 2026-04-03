@@ -15,6 +15,7 @@ export interface BackendIncident {
   description: string
   category: string
   severity: number
+  report_count?: number
   latitude: number
   longitude: number
   address: string | null
@@ -89,6 +90,7 @@ export const normalizeIncident = (inc: BackendIncident): Incident => ({
   id: String(inc.id),
   category: (inc.category.charAt(0).toUpperCase() + inc.category.slice(1)) as IncidentCategory,
   status: (inc.status.charAt(0).toUpperCase() + inc.status.slice(1)) as IncidentStatus,
+  report_count: inc.report_count ?? 1,
   timestamp: new Date(inc.created_at),
   location: {
     x: ((inc.longitude + 118.5) / 1) * 100,

@@ -1,16 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Shield, User, Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react"
-import { apiClient } from "@/lib/api"
+import { AlertCircle, ArrowRight, Loader2, Lock, Mail, Shield, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { apiClient } from "@/lib/api"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -23,96 +23,97 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleChange = (field: string, value: string) => {
+    setFormData((previous) => ({ ...previous, [field]: value }))
+  }
+
+  const handleRegister = async (event: React.FormEvent) => {
+    event.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
       const { ok, error: apiError } = await apiClient.register(formData)
+
       if (ok) {
         router.push("/login?registered=true")
-      } else {
-        setError(apiError || "Registration failed")
+        return
       }
-    } catch (err) {
+
+      setError(typeof apiError === "string" ? apiError : "Registration failed")
+    } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[40%] -right-[10%] w-[70%] h-[70%] bg-red-900/10 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[40%] -left-[10%] w-[70%] h-[70%] bg-zinc-900/40 rounded-full blur-[120px]" />
+    <div className="flex min-h-screen items-center justify-center bg-[#030507] px-4">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -right-[10%] -top-[35%] h-[70%] w-[70%] rounded-full bg-emerald-600/10 blur-[120px]" />
+        <div className="absolute -bottom-[40%] -left-[10%] h-[70%] w-[70%] rounded-full bg-zinc-900/50 blur-[120px]" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-lg px-4 z-10"
+        transition={{ duration: 0.45 }}
+        className="relative z-10 w-full max-w-lg"
       >
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center mb-4 border border-red-500/20">
-            <Shield className="w-8 h-8 text-red-500" />
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10">
+            <Shield className="h-8 w-8 text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">CrisisLens Account</h1>
-          <p className="text-zinc-400 mt-2">Join the disaster response network</p>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-100">Crisis Lens Account</h1>
+          <p className="mt-2 text-zinc-400">Create access to live alerts, dashboard awareness, and incident reporting.</p>
         </div>
 
-        <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-xl shadow-2xl">
+        <Card className="border-zinc-800 bg-zinc-900/60 shadow-2xl backdrop-blur-xl">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-xl text-zinc-100">Create account</CardTitle>
-            <CardDescription className="text-zinc-500">
-              Enter your information to get started
-            </CardDescription>
+            <CardDescription className="text-zinc-500">Enter your information to get started</CardDescription>
           </CardHeader>
           <form onSubmit={handleRegister}>
             <CardContent className="space-y-4">
-              {error && (
+              {error ? (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-center gap-3 text-red-400 text-sm"
+                  className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
                 >
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <AlertCircle className="h-4 w-4 shrink-0" />
                   <p>{error}</p>
                 </motion.div>
-              )}
+              ) : null}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-zinc-400">Full Name</Label>
+                  <Label htmlFor="name" className="text-zinc-400">
+                    Full Name
+                  </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                     <Input
                       id="name"
-                      placeholder="John Doe"
                       required
-                      className="bg-zinc-950/50 border-zinc-800 text-zinc-200 pl-10 focus:ring-red-500/20 focus:border-red-500/50 h-10"
+                      placeholder="John Doe"
                       value={formData.name}
-                      onChange={(e) => handleChange("name", e.target.value)}
+                      onChange={(event) => handleChange("name", event.target.value)}
+                      className="h-10 border-zinc-800 bg-zinc-950/50 pl-10 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-zinc-400">Account Type</Label>
-                  <Select 
-                    onValueChange={(val) => handleChange("role", val)} 
-                    defaultValue="citizen"
-                  >
-                    <SelectTrigger className="bg-zinc-950/50 border-zinc-800 text-zinc-200 focus:ring-red-500/20 focus:border-red-500/50 h-10">
+                  <Label htmlFor="role" className="text-zinc-400">
+                    Account Type
+                  </Label>
+                  <Select defaultValue="citizen" onValueChange={(value) => handleChange("role", value)}>
+                    <SelectTrigger className="h-10 border-zinc-800 bg-zinc-950/50 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200">
+                    <SelectContent className="border-zinc-800 bg-zinc-900 text-zinc-200">
                       <SelectItem value="citizen">Citizen Observer</SelectItem>
                       <SelectItem value="responder">Responder / Official</SelectItem>
                       <SelectItem value="admin">Administrator</SelectItem>
@@ -122,54 +123,60 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-400">Email Address</Label>
+                <Label htmlFor="email" className="text-zinc-400">
+                  Email Address
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@crisislens.com"
                     required
-                    className="bg-zinc-950/50 border-zinc-800 text-zinc-200 pl-10 focus:ring-red-500/20 focus:border-red-500/50 h-10"
+                    placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
+                    onChange={(event) => handleChange("email", event.target.value)}
+                    className="h-10 border-zinc-800 bg-zinc-950/50 pl-10 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-zinc-400">Password</Label>
+                <Label htmlFor="password" className="text-zinc-400">
+                  Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                   <Input
                     id="password"
                     type="password"
                     required
-                    className="bg-zinc-950/50 border-zinc-800 text-zinc-200 pl-10 focus:ring-red-500/20 focus:border-red-500/50 h-10"
-                    placeholder="••••••••"
+                    placeholder="********"
                     value={formData.password}
-                    onChange={(e) => handleChange("password", e.target.value)}
+                    onChange={(event) => handleChange("password", event.target.value)}
+                    className="h-10 border-zinc-800 bg-zinc-950/50 pl-10 text-zinc-200 focus:border-emerald-500/50 focus:ring-emerald-500/20"
                   />
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4 mt-2">
-              <Button 
-                type="submit" 
+
+            <CardFooter className="mt-2 flex flex-col gap-4">
+              <Button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-red-600 hover:bg-red-500 text-white font-medium h-11 transition-all"
+                className="h-11 w-full bg-emerald-500 font-medium text-black transition-all hover:bg-emerald-400"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    Create Account <ArrowRight className="w-4 h-4 ml-2" />
+                    Create Account
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
-              <p className="text-sm text-center text-zinc-500 font-normal">
+              <p className="text-center text-sm font-normal text-zinc-500">
                 Already have an account?{" "}
-                <Link href="/login" className="text-red-500 hover:text-red-400 font-medium transition-colors">
+                <Link href="/login" className="font-medium text-emerald-400 transition-colors hover:text-emerald-300">
                   Sign In
                 </Link>
               </p>
