@@ -1,4 +1,4 @@
-from fastapi import UploadFile, File, APIRouter, Depends, HTTPException, status
+from fastapi import UploadFile, File, Form, APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List
@@ -61,6 +61,7 @@ async def report_incident(
         severity=incident.severity,
         latitude=incident.latitude,
         longitude=incident.longitude,
+        address=incident.address,
         reported_by=current_user.id 
     )
     db.add(new_incident)
@@ -125,18 +126,29 @@ from fastapi import UploadFile, File, APIRouter, Depends, HTTPException, status,
 @router.post("/upload", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
 async def report_incident_via_image(
     file: UploadFile = File(...),
+<<<<<<< HEAD
     latitude: float = Form(None),
     longitude: float = Form(None),
     title: str = Form(None),
     description: str = Form(None),
     category: str = Form(None),
     severity: int = Form(None),
+=======
+    title: str | None = Form(None),
+    description: str | None = Form(None),
+    category: str | None = Form(None),
+    severity: int | None = Form(None),
+    latitude: float | None = Form(None),
+    longitude: float | None = Form(None),
+    address: str | None = Form(None),
+>>>>>>> 84925f3 (added docker)
     db: Session = Depends(get_db),
     current_user: User = Depends(allow_any_user)
 ):
     image_bytes = await file.read()
     extracted_data = extract_image_data(image_bytes)
 
+<<<<<<< HEAD
     # Use manual inputs if provided, otherwise fallback to AI/EXIF extraction
     final_lat = latitude if latitude is not None else extracted_data["latitude"]
     final_lng = longitude if longitude is not None else extracted_data["longitude"]
@@ -184,6 +196,26 @@ async def report_incident_via_image(
         severity=final_sev,
         latitude=final_lat,
         longitude=final_lng,
+=======
+    incident_payload = {
+        "title": title or extracted_data["title"],
+        "description": description or extracted_data["description"],
+        "category": category or extracted_data["category"],
+        "severity": severity if severity is not None else extracted_data["severity"],
+        "latitude": latitude if latitude is not None else extracted_data["latitude"],
+        "longitude": longitude if longitude is not None else extracted_data["longitude"],
+        "address": address,
+    }
+
+    new_incident = Incident(
+        title=incident_payload["title"],
+        description=incident_payload["description"],
+        category=incident_payload["category"],
+        severity=incident_payload["severity"],
+        latitude=incident_payload["latitude"],
+        longitude=incident_payload["longitude"],
+        address=incident_payload["address"],
+>>>>>>> 84925f3 (added docker)
         reported_by=current_user.id
     )
 

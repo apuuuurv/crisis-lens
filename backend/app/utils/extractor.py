@@ -9,8 +9,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Configure the new Gemini Client
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+def _get_gemini_client():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
 
 def _get_decimal_from_dms(dms, ref):
     """Converts EXIF Degrees/Minutes/Seconds to Decimal Coordinates."""
@@ -60,16 +63,20 @@ def extract_image_data(image_bytes: bytes):
     """
     
     try:
+        client = _get_gemini_client()
+        if client is None:
+            raise ValueError("GEMINI_API_KEY is not configured")
+
         # Send image and prompt to Gemini using the new syntax and latest model
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=[prompt, image]
         )
-        
+
         # Clean up the response in case the model adds markdown formatting
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
         ai_data = json.loads(clean_text)
-        
+
         ai_analysis = {
             "title": ai_data.get("title", "Unknown Incident"),
             "description": ai_data.get("description", "No description available."),
@@ -80,7 +87,7 @@ def extract_image_data(image_bytes: bytes):
         }
     except Exception as e:
         print(f"Gemini AI Analysis Failed: {e}")
-        # Fallback if the AI fails or hits a rate limit
+        # Fallback if the AI fails, is disabled, or hits a rate limit
         ai_analysis = {
             "title": "Unverified User Upload",
             "description": "Image uploaded, awaiting manual review.",

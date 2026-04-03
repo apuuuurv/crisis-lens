@@ -74,13 +74,11 @@ async function safeFetch(path: string, options: RequestInit = {}) {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}))
-      console.error(`API Error [${res.status}]:`, errorData.detail || "Unknown error")
       return { ok: false, status: res.status, data: null, error: errorData.detail }
     }
     const data = await res.json()
     return { ok: true, status: res.status, data }
   } catch (error) {
-    console.error("Network Error:", error)
     return { ok: false, status: 503, data: null, error: "Backend Offline" }
   }
 }

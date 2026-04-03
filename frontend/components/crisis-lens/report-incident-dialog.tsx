@@ -60,18 +60,18 @@ export function ReportIncidentDialog({
     const files = Array.from(e.dataTransfer.files)
     const imageFiles = files.filter(f => f.type.startsWith("image/"))
     
-    // Simulate file upload
-    imageFiles.forEach(file => {
-      setUploadedFiles(prev => [...prev, file])
-    })
+    if (imageFiles[0]) {
+      setUploadedFiles([imageFiles[0]])
+    }
   }, [])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      Array.from(files).forEach(file => {
-        setUploadedFiles(prev => [...prev, file])
-      })
+      const imageFile = Array.from(files).find(file => file.type.startsWith("image/"))
+      if (imageFile) {
+        setUploadedFiles([imageFile])
+      }
     }
   }, [])
 
@@ -85,11 +85,15 @@ export function ReportIncidentDialog({
     if (uploadedFiles.length > 0) {
       const formData = new FormData()
       formData.append("file", uploadedFiles[0])
+      if (title.trim()) formData.append("title", title.trim())
+      if (description.trim()) formData.append("description", description.trim())
+      formData.append("category", category)
+      formData.append("severity", String(severity[0]))
       onSubmit(formData as any)
     } else {
       onSubmit({
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         category,
         severity: severity[0],
         // status is handled by backend or default
@@ -215,7 +219,6 @@ export function ReportIncidentDialog({
               <input
                 type="file"
                 accept="image/*"
-                multiple
                 onChange={handleFileSelect}
                 className="absolute inset-0 cursor-pointer opacity-0"
               />
@@ -223,10 +226,10 @@ export function ReportIncidentDialog({
                 isDragOver ? "text-emerald" : "text-muted-foreground"
               }`} />
               <p className="text-sm text-muted-foreground">
-                Drag & drop images or click to upload
+                Drag & drop one image or click to upload
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                AI will extract location and incident details
+                AI can extract incident details, while your form inputs stay as fallback
               </p>
             </div>
 
@@ -272,7 +275,7 @@ export function ReportIncidentDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!title.trim()}
+            disabled={!title.trim() && uploadedFiles.length === 0}
             className="bg-emerald text-primary-foreground hover:bg-emerald/90"
           >
             Submit Report

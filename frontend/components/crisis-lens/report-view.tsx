@@ -92,8 +92,8 @@ export function ReportView() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files) {
-      setUploadedFiles(prev => [...prev, ...Array.from(files)])
+    if (files?.[0]) {
+      setUploadedFiles([files[0]])
     }
   }
 
@@ -102,8 +102,13 @@ export function ReportView() {
   }
 
   const handleSubmit = async () => {
-    if (!title || !location) {
-      toast.error("Please provide a title and location")
+    if (!location) {
+      toast.error("Please provide a location")
+      return
+    }
+
+    if (!title.trim() && uploadedFiles.length === 0) {
+      toast.error("Please provide a title or attach a photo")
       return
     }
 
@@ -113,6 +118,7 @@ export function ReportView() {
       if (uploadedFiles.length > 0) {
         const formData = new FormData()
         formData.append("file", uploadedFiles[0])
+<<<<<<< HEAD
         result = await apiClient.reportIncidentWithImage(formData, {
           latitude: location[0],
           longitude: location[1],
@@ -120,10 +126,20 @@ export function ReportView() {
           description: description,
           category: category
         })
+=======
+        if (title.trim()) formData.append("title", title.trim())
+        if (description.trim()) formData.append("description", description.trim())
+        formData.append("category", category)
+        formData.append("severity", String(severity[0]))
+        formData.append("latitude", String(location[0]))
+        formData.append("longitude", String(location[1]))
+        if (address) formData.append("address", address)
+        result = await apiClient.reportIncidentWithImage(formData)
+>>>>>>> 84925f3 (added docker)
       } else {
         result = await apiClient.reportIncident({
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim(),
           category,
           latitude: location[0],
           longitude: location[1],
@@ -261,7 +277,9 @@ export function ReportView() {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Issue Summary</Label>
+                <Label htmlFor="title">
+                  Issue Summary {uploadedFiles.length > 0 ? "(Optional with photo)" : ""}
+                </Label>
                 <Input 
                   id="title" 
                   placeholder="e.g., Structure fire, Flooded intersection"
@@ -331,7 +349,7 @@ export function ReportView() {
                   ) : (
                     <>
                       <Upload className="mb-2 size-8 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Upload or take a photo</p>
+                      <p className="text-sm text-muted-foreground">Upload or take one photo</p>
                     </>
                   )}
                 </div>

@@ -162,6 +162,12 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
     try {
       let newIncident;
       if (payload instanceof FormData) {
+        const latitude = userLocation?.lat || 34.0522
+        const longitude = userLocation?.lng || -118.2437
+
+        if (!payload.has("latitude")) payload.append("latitude", String(latitude))
+        if (!payload.has("longitude")) payload.append("longitude", String(longitude))
+
         newIncident = await apiClient.reportIncidentWithImage(payload)
       } else {
         const finalPayload = {

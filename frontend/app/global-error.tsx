@@ -7,11 +7,8 @@ export default function GlobalError({
 }) {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
 
-  // Log the error to the console so it will be forwarded to server logs and captured by auto-fix
-  console.error(error)
-
   return (
-    <html>
+    <html suppressHydrationWarning>
       <head>
         <style>{`
           * { box-sizing: border-box; }
@@ -113,7 +110,7 @@ export default function GlobalError({
           }
         `}</style>
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <div className="error-container">
           <div className="error-header">
             <div className="error-icon">!</div>
