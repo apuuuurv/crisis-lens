@@ -118,7 +118,6 @@ export function ReportView() {
       if (uploadedFiles.length > 0) {
         const formData = new FormData()
         formData.append("file", uploadedFiles[0])
-<<<<<<< HEAD
         result = await apiClient.reportIncidentWithImage(formData, {
           latitude: location[0],
           longitude: location[1],
@@ -126,16 +125,6 @@ export function ReportView() {
           description: description,
           category: category
         })
-=======
-        if (title.trim()) formData.append("title", title.trim())
-        if (description.trim()) formData.append("description", description.trim())
-        formData.append("category", category)
-        formData.append("severity", String(severity[0]))
-        formData.append("latitude", String(location[0]))
-        formData.append("longitude", String(location[1]))
-        if (address) formData.append("address", address)
-        result = await apiClient.reportIncidentWithImage(formData)
->>>>>>> 84925f3 (added docker)
       } else {
         result = await apiClient.reportIncident({
           title: title.trim(),

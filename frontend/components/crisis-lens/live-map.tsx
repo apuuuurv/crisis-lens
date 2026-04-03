@@ -77,8 +77,13 @@ function HeatmapLayer({ incidents }: { incidents: Incident[] }) {
 
 export default function LiveMap({ incidents, resources, onIncidentClick }: LiveMapProps) {
   const defaultCenter: [number, number] = [37.7749, -122.4194]
-<<<<<<< HEAD
+  const [isMounted, setIsMounted] = useState(false)
+  const [mapInstanceKey] = useState(() => `live-map-${Date.now()}`)
   const [showHeatmap, setShowHeatmap] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   return (
     <div className="group relative h-full w-full overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
@@ -97,30 +102,7 @@ export default function LiveMap({ incidents, resources, onIncidentClick }: LiveM
         </button>
       </div>
 
-      <MapContainer
-        center={defaultCenter}
-        zoom={12}
-        style={{ height: "100%", width: "100%" }}
-        zoomControl={false}
-      >
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          maxNativeZoom={18} // Stops requesting new tiles from Esri at zoom level 18
-          maxZoom={22}       // Allows the user to physically zoom into the map up to level 22
-          attribution="Tiles &copy; Esri &mdash; Source: Esri..."
-        />
-=======
-  const [isMounted, setIsMounted] = useState(false)
-  const [mapInstanceKey] = useState(() => `live-map-${Date.now()}`)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  return (
-    <div className="h-full w-full overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
       <div className="pointer-events-none absolute inset-0 z-[1000] bg-[rgba(16,185,129,0.03)] opacity-20 transition-opacity group-hover:opacity-10" />
->>>>>>> 84925f3 (added docker)
 
       {isMounted ? (
         <MapContainer
@@ -137,56 +119,43 @@ export default function LiveMap({ incidents, resources, onIncidentClick }: LiveM
             attribution="Tiles &copy; Esri &mdash; Source: Esri..."
           />
 
-<<<<<<< HEAD
-        <MapUpdater incidents={incidents} />
-        {showHeatmap && <HeatmapLayer incidents={incidents} />}
-
-        <MarkerClusterGroup
-          chunkedLoading
-          maxClusterRadius={60}
-          spiderfyOnMaxZoom={true}
-          showCoverageOnHover={false}
-        >
-          {/* Incident Markers */}
-          {incidents.map((incident) => (
-            (incident.latitude && incident.longitude) ? (
-=======
           <MapUpdater incidents={incidents} />
+          {showHeatmap && <HeatmapLayer incidents={incidents} />}
 
-          {incidents.map((incident) => (
-            incident.latitude && incident.longitude ? (
->>>>>>> 84925f3 (added docker)
-              <Marker
-                key={incident.id}
-                position={[incident.latitude, incident.longitude]}
-                eventHandlers={{
-                  click: () => onIncidentClick?.(incident),
-                }}
-              >
-                <Popup className="custom-popup">
-                  <div className="p-2">
-                    <h3 className="font-bold text-emerald-400">{incident.title}</h3>
-                    {incident.address && (
-                      <p className="mb-1 text-[10px] leading-tight text-zinc-400">
-                        <MapPin className="mr-1 inline-block size-3" />
-                        {incident.address}
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={60}
+            spiderfyOnMaxZoom={true}
+            showCoverageOnHover={false}
+          >
+            {incidents.map((incident) => (
+              incident.latitude && incident.longitude ? (
+                <Marker
+                  key={incident.id}
+                  position={[incident.latitude, incident.longitude]}
+                  eventHandlers={{
+                    click: () => onIncidentClick?.(incident),
+                  }}
+                >
+                  <Popup className="custom-popup">
+                    <div className="p-2">
+                      <h3 className="font-bold text-emerald-400">{incident.title}</h3>
+                      {incident.address && (
+                        <p className="mb-1 text-[10px] leading-tight text-zinc-400">
+                          <MapPin className="mr-1 inline-block size-3" />
+                          {incident.address}
+                        </p>
+                      )}
+                      <p className="text-xs text-zinc-300">
+                        {incident.category} • Reports: {incident.report_count}
                       </p>
-                    )}
-<<<<<<< HEAD
-                    <p className="text-xs text-zinc-300">{incident.category} • Reports: {incident.report_count}</p>
-=======
-                    <p className="text-xs text-zinc-300">{incident.category} • Severity: {incident.severity}/10</p>
->>>>>>> 84925f3 (added docker)
-                    <p className="mt-1 text-xs italic">{incident.status}</p>
-                  </div>
-                </Popup>
-              </Marker>
-            ) : null
-          ))}
-<<<<<<< HEAD
-        </MarkerClusterGroup>
-=======
->>>>>>> 84925f3 (added docker)
+                      <p className="mt-1 text-xs italic">{incident.status}</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ) : null
+            ))}
+          </MarkerClusterGroup>
 
           {resources.map((resource) => (
             resource.latitude && resource.longitude ? (

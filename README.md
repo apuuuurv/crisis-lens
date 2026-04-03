@@ -1,91 +1,220 @@
-# 🌍 CrisisLens: Disaster Resilience & Crisis Management
+# CrisisLens
 
-CrisisLens is a hyper-local disaster response coordination platform designed to empower citizens and responders with real-time data, AI-driven insights, and seamless communication during crises.
+CrisisLens is a hyper-local disaster response coordination platform for reporting incidents, monitoring live maps, dispatching resources, and coordinating crisis response.
 
----
+## What Teammates Need
 
-## 🚀 Getting Started
+Before running the project, each teammate needs:
 
-Follow these steps to set up the project locally on your machine.
+- Git
+- Docker Desktop
+- A local copy of the repo
+- A `backend/.env` file with valid project keys
 
-### 📋 Prerequisites
-- **Node.js**: v18.x or higher
-- **Python**: v3.10.x or higher
-- **npm**: (Installed with Node.js)
-- **pip**: (Python package manager)
+Recommended approach:
 
----
+- Use Docker dev mode
+- This avoids Node/Python version mismatch across devices
+- Frontend and backend run on the same ports for everyone
 
-## 🛠️ Backend Setup (FastAPI)
+## Clone The Repo
 
-1. **Navigate to the backend directory**:
-   ```bash
-   cd backend
-   ```
+```bash
+git clone https://github.com/apuuuurv/crisis-lens.git
+cd crisis-lens
+```
 
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv venv
-   # On Linux/macOS
-   source venv/bin/activate  
-   # On Windows
-   .\venv\Scripts\activate
-   ```
+## Environment Setup
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Create `backend/.env`.
 
-4. **Environment Configuration**:
-   Create a `.env` file in the `backend` folder (or copy from `.env.example`):
-   ```bash
-   cp .env.example .env
-   ```
-   *Edit the `.env` file to set your `DATABASE_URL` (SQLite by default: `sqlite:///./disaster_network.db`).*
+You can start from:
 
-5. **Run the server**:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-   *API will be available at: [http://localhost:8000](http://localhost:8000)*
-   *Auto-docs available at: [http://localhost:8000/docs](http://localhost:8000/docs)*
+```bash
+cp backend/.env.example backend/.env
+```
 
----
+Then update the values.
 
-## 🎨 Frontend Setup (Next.js)
+Typical fields used by the app:
 
-1. **Navigate to the frontend directory**:
-   ```bash
-   cd frontend
-   ```
+```env
+DATABASE_URL=...
+SECRET_KEY=...
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+GEMINI_API_KEY=...
+```
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+Important:
 
-3. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-   *Frontend will be available at: [http://localhost:3000](http://localhost:3000)*
+- Do not commit `backend/.env`
+- Share real keys securely with teammates
+- If `GEMINI_API_KEY` is missing, the backend will still start, but image AI analysis will fall back gracefully
 
----
+## Recommended: Run With Docker Dev
 
-## ✨ Features
+Start Docker Desktop first.
 
-- **Live Crisis Map**: Real-time visualization of incidents and resources using Leaflet.
-- **Incident Reporting**: Easy reporting for citizens with category tagging and severity levels.
-- **AI-Driven Risk Analysis**: Automated risk scoring for geographical zones.
-- **Resource Management**: Tracking and dispatching responders (Ambulances, Fire Trucks).
-- **Authentication**: Secure JWT-based login for Citizens and Responders.
+Then from the repo root:
 
----
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-## 🛠️ Tech Stack
+This starts:
 
-- **Frontend**: Next.js 16 (App Router), Tailwind CSS 4, Framer Motion, Lucide Icons.
-- **Backend**: FastAPI, SQLAlchemy (ORM), Pydantic (Validation).
-- **Database**: SQLite (Development) / PostgreSQL (Production).
-- **Mapping**: React Leaflet / OpenStreetMap.
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
+
+Why this is recommended:
+
+- Pinned Node and Python versions
+- Fewer dependency/version issues across devices
+- Frontend hot reload
+- Backend hot reload
+
+## Production-Style Docker Run
+
+If someone wants a cleaner non-dev container run:
+
+```bash
+docker compose up --build
+```
+
+This also serves:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+
+## If Ports 3000 or 8000 Are Busy
+
+The project needs:
+
+- `3000` for frontend
+- `8000` for backend
+
+If Docker fails with a port error, stop the process already using that port.
+
+On Windows PowerShell:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000,8000 -State Listen
+Stop-Process -Id <PID> -Force
+```
+
+Common blockers we hit during setup:
+
+- old Next.js dev server
+- old Uvicorn backend
+- VS Code extension helper processes using port `3000`
+
+## Local Non-Docker Setup
+
+Use this only if you do not want Docker.
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+```
+
+Activate the environment:
+
+Windows:
+
+```bash
+.\venv\Scripts\activate
+```
+
+macOS/Linux:
+
+```bash
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+pip install SQLAlchemy google-genai
+```
+
+Run backend:
+
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+### Frontend
+
+In a new terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev -- --webpack --port 3000
+```
+
+## Teammate Pull Workflow
+
+Whenever teammates pull new changes:
+
+```bash
+git pull origin main
+```
+
+Then:
+
+1. Check whether `backend/.env` still has the required values
+2. Rebuild containers if Docker files or dependencies changed
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+If they are using local non-Docker setup:
+
+```bash
+cd frontend && npm install
+cd ../backend && pip install -r requirements.txt
+```
+
+## Known Setup Notes
+
+- Docker compose files read environment from `backend/.env`
+- Frontend uses `NEXT_PUBLIC_API_URL=http://localhost:8000`
+- Some new frontend dependencies were added for map clustering and heatmap support
+- If a teammate gets `Module not found` errors after pull, they should rerun `npm install`
+- If a teammate gets backend import/dependency issues locally, Docker dev mode is the preferred fix
+
+## Useful Commands
+
+Stop Docker dev stack:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+Stop production-style Docker stack:
+
+```bash
+docker compose down
+```
+
+Rebuild from scratch:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml up --build
+```
+
+## Tech Stack
+
+- Frontend: Next.js 16, React 19, Tailwind CSS, React Leaflet
+- Backend: FastAPI, SQLAlchemy, Pydantic
+- Database: PostgreSQL or SQLite
+- AI/Image Analysis: Gemini
+
