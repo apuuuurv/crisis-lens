@@ -17,12 +17,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
   type Incident,
   type Resource
 } from "@/lib/crisis-data"
-import { apiClient, BackendAlert } from "@/lib/api"
+import { apiClient, BackendAlert, type AdminResolutionFeedback } from "@/lib/api"
 import dynamic from "next/dynamic"
 import { CrisisFeed } from "./crisis-feed"
 import { ResourceTray } from "./resource-tray"
@@ -48,8 +55,14 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [dispatchDialogOpen, setDispatchDialogOpen] = useState(false)
   const [selectedIncidentForDispatch, setSelectedIncidentForDispatch] = useState<Incident | null>(null)
+  const [adminResolutionFeedback, setAdminResolutionFeedback] = useState<AdminResolutionFeedback[]>([])
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false)
 
   const ws = useRef<WebSocket | null>(null)
+  const syncIncidentsFromServer = async () => {
+    const data = await apiClient.getIncidents({ includeResolved: true })
+    setIncidents(data as Incident[])
+  }
 
   // 1. Authentication & Initial Fetching
   useEffect(() => {
@@ -60,12 +73,14 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
       if (isAuth && role === "admin") {
         setIsAuthenticated(true)
         try {
-          const [fetchedIncidents, fetchedResources] = await Promise.all([
-            apiClient.getIncidents(),
-            apiClient.getResources()
+          const [fetchedIncidents, fetchedResources, feedback] = await Promise.all([
+            apiClient.getIncidents({ includeResolved: true }),
+            apiClient.getResources(),
+            apiClient.getAdminResolutionFeedback(),
           ])
           setIncidents(fetchedIncidents as Incident[])
           setResources(fetchedResources as Resource[])
+          setAdminResolutionFeedback(feedback)
         } catch (error) {
           console.error("Fetch Error:", error)
           toast.error("Fetch Error")
@@ -79,22 +94,28 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
 
   // 2. Real-time WebSockets
   useEffect(() => {
-    ws.current = new WebSocket("ws://localhost:8000/ws/incidents")
+    ws.current = new WebSocket("ws://127.0.0.1:8000/ws/incidents")
 
     ws.current.onmessage = (event) => {
       const message = JSON.parse(event.data)
       if (message.type === "NEW_INCIDENT") {
         const newIncident = message.data
-        apiClient.getIncidents().then(data => setIncidents(data as Incident[]))
+        syncIncidentsFromServer().catch(() => {
+          toast.error("Unable to sync incidents")
+        })
         toast.error(`NEW INCIDENT: ${newIncident.category}`, {
           description: newIncident.title,
           duration: 5000,
         })
-      } else if (message.type === "UPDATE_INCIDENT") {
-        const updateData = message.data
-        setIncidents(prev =>
-          prev.map(inc => inc.id === String(updateData.id) ? { ...inc, ...updateData, id: inc.id } : inc)
-        )
+      } else if (
+        message.type === "UPDATE_INCIDENT" ||
+        message.type === "RESOLUTION_REQUESTED" ||
+        message.type === "RESOLUTION_RESPONSE"
+      ) {
+        syncIncidentsFromServer().catch(() => {
+          toast.error("Unable to sync incidents")
+        })
+        apiClient.getAdminResolutionFeedback().then(setAdminResolutionFeedback).catch(() => {})
       }
     }
 
@@ -116,20 +137,21 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
     )
 
     const alertInterval = setInterval(async () => {
-      const resp = await apiClient.getAlerts()
+      const [resp, feedback] = await Promise.all([
+        apiClient.getAlerts(),
+        apiClient.getAdminResolutionFeedback(),
+      ])
       const activeAlerts = Array.isArray(resp) ? resp : []
       const unread = activeAlerts.filter(a => !a.is_read)
-
-      if (unread.length > unreadAlerts.length) {
-        setUnreadAlerts(unread)
-      }
+      setUnreadAlerts(unread)
+      setAdminResolutionFeedback(feedback)
     }, 10000)
 
     return () => {
       navigator.geolocation.clearWatch(watchId)
       clearInterval(alertInterval)
     }
-  }, [isAuthenticated, unreadAlerts])
+  }, [isAuthenticated])
 
   const navItems: { id: NavItem; label: string; icon: typeof Map }[] = [
     { id: "map", label: "Live Map", icon: Map },
@@ -138,7 +160,9 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
     { id: "analytics", label: "Risk Analytics", icon: BarChart3 },
   ]
 
-  const activeIncidents = incidents.filter(i => i.status === "Active").length
+  const activeIncidents = incidents.filter(i => i.status !== "Resolved").length
+  const resolvedIncidents = incidents.filter(i => i.status === "Resolved").length
+  const pendingUserResponses = adminResolutionFeedback.length
 
   const handleUpvote = async (incidentId: string) => {
     try {
@@ -198,7 +222,25 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
     })
   }
 
+  const handleResolveIncident = async (incidentId: string) => {
+    try {
+      const result = await apiClient.requestIncidentResolution(incidentId)
+      toast.success("Confirmation sent to reporter", {
+        description: result?.message ?? "Waiting for user confirmation before resolving.",
+      })
+      syncIncidentsFromServer().catch(() => {
+        toast.error("Unable to sync incidents")
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to resolve incident"
+      toast.error(message)
+    }
+  }
+
   const handleOpenDispatch = (incident: Incident) => {
+    if (incident.status === "Resolved") {
+      return
+    }
     setSelectedIncidentForDispatch(incident)
     setDispatchDialogOpen(true)
   }
@@ -317,8 +359,18 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
             </Badge>
             <Badge variant="outline" className="gap-2 border-emerald/30 bg-emerald/10 text-emerald">
               <span className="size-2 rounded-full bg-emerald" />
+              {resolvedIncidents} Resolved Issues
+            </Badge>
+            <Badge variant="outline" className="gap-2 border-emerald/30 bg-emerald/10 text-emerald">
+              <span className="size-2 rounded-full bg-emerald" />
               {resources.filter(r => r.status === "Available").length} Units Available
             </Badge>
+            <button type="button" onClick={() => setFeedbackDialogOpen(true)}>
+              <Badge variant="outline" className="gap-2 border-amber/30 bg-amber/10 text-amber">
+                <span className="size-2 rounded-full bg-amber" />
+                {pendingUserResponses} User Follow-ups
+              </Badge>
+            </button>
           </div>
         </motion.header>
 
@@ -505,7 +557,49 @@ export function Dashboard({ onBackToLanding }: DashboardProps) {
         incident={selectedIncidentForDispatch}
         resources={resources.filter(r => r.status === "Available")}
         onDispatch={handleDispatch}
+        onResolve={handleResolveIncident}
       />
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-3xl border-glass-border bg-glass backdrop-blur-xl">
+          <DialogHeader>
+            <DialogTitle>User Follow-ups</DialogTitle>
+            <DialogDescription>
+              Users who said the incident is still active after an admin resolution request.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[65vh] pr-4">
+            <div className="space-y-3">
+              {adminResolutionFeedback.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                  No user follow-ups right now.
+                </div>
+              ) : (
+                adminResolutionFeedback.map((item) => (
+                  <div key={item.request_id} className="rounded-xl border border-border bg-card/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-foreground">{item.incident_title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.user_name} • {item.user_email}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="border-amber/30 bg-amber/10 text-amber">
+                        Needs review
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm text-foreground">
+                      {item.response_message || "Reporter says the issue is still active."}
+                    </p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      {item.responded_at ? item.responded_at.toLocaleString() : item.created_at.toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

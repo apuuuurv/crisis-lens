@@ -13,7 +13,7 @@ interface AlertPanelProps {
 
 export function AlertPanel({ alerts }: AlertPanelProps) {
   return (
-    <Card className="rounded-[28px] border-white/10 bg-[#050816]/95 text-white">
+    <Card className="rounded-[28px] border-glass-border bg-glass text-foreground">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="font-[family:var(--font-display)] text-2xl">Safety alerts</CardTitle>
@@ -24,7 +24,7 @@ export function AlertPanel({ alerts }: AlertPanelProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         {alerts.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-white/10 px-5 py-10 text-center text-sm text-zinc-400">
+          <div className="rounded-3xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground">
             No alerts
           </div>
         ) : (
@@ -35,12 +35,12 @@ export function AlertPanel({ alerts }: AlertPanelProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.08 }}
             >
-              <Alert className="rounded-[24px] border-white/10 bg-white/5 text-white">
+              <Alert className="rounded-[24px] border-border bg-card/80 text-foreground">
                 <BellRing className="text-emerald-400" />
-                <AlertTitle className="text-white">Priority update</AlertTitle>
-                <AlertDescription className="text-zinc-300">
+                <AlertTitle className="text-foreground">Priority update</AlertTitle>
+                <AlertDescription className="text-muted-foreground">
                   <p>{alert.message}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-zinc-500">{alert.relativeTime}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">{alert.relativeTime}</p>
                 </AlertDescription>
               </Alert>
             </motion.div>

@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Boolean, LargeBinary
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -61,10 +61,17 @@ class Incident(Base):
     trust_status = Column(String, default=IncidentTrustStatus.trusted.value)
     reported_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # NEW COLUMNS FOR VERIFICATION
     upvotes = Column(Integer, default=0)
     is_verified = Column(Boolean, default=False)
+    ai_label = Column(String, nullable=True)
+    ai_confidence = Column(Float, nullable=True)
+    is_suspicious = Column(Boolean, default=False)
+    image_filename = Column(String, nullable=True)
+    image_content_type = Column(String, nullable=True)
+    image_data = Column(LargeBinary, nullable=True)
 
     # Relationships
     reporter = relationship("User", back_populates="incidents")
@@ -78,10 +85,30 @@ class ReportSubmission(Base):
     incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
+    image_filename = Column(String, nullable=True)
+    image_content_type = Column(String, nullable=True)
+    image_data = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User")
     incident = relationship("Incident")
+
+
+class ResolutionRequest(Base):
+    __tablename__ = "resolution_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    requested_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default="pending", nullable=False)
+    response_message = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+
+    incident = relationship("Incident")
+    user = relationship("User", foreign_keys=[user_id])
+    requested_by_admin = relationship("User", foreign_keys=[requested_by_admin_id])
 
 class Resource(Base):
     __tablename__ = "resources"

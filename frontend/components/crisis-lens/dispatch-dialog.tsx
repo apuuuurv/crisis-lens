@@ -23,6 +23,7 @@ interface DispatchDialogProps {
   incident: Incident | null
   resources: Resource[]
   onDispatch: (resourceId: string, incidentId: string) => void
+  onResolve: (incidentId: string) => Promise<void> | void
 }
 
 export function DispatchDialog({
@@ -31,6 +32,7 @@ export function DispatchDialog({
   incident,
   resources,
   onDispatch,
+  onResolve,
 }: DispatchDialogProps) {
   const [selectedResource, setSelectedResource] = useState<string | null>(null)
 
@@ -40,6 +42,14 @@ export function DispatchDialog({
       setSelectedResource(null)
       onOpenChange(false)
     }
+  }
+
+  const handleResolve = async () => {
+    if (!incident) return
+
+    await onResolve(incident.id)
+    setSelectedResource(null)
+    onOpenChange(false)
   }
 
   const getResourceIcon = (type: Resource["type"]) => {
@@ -68,7 +78,7 @@ export function DispatchDialog({
             Dispatch Resource
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Assign an available unit to respond to this incident.
+            Assign an available unit to respond to this incident. Resolving will now ask the reporting user to confirm first.
           </DialogDescription>
         </DialogHeader>
 
@@ -166,6 +176,12 @@ export function DispatchDialog({
           >
             <Send className="mr-2 size-4" />
             Dispatch Unit
+          </Button>
+          <Button
+            onClick={handleResolve}
+            className="bg-emerald text-primary-foreground hover:bg-emerald/90"
+          >
+            Resolve Incident
           </Button>
         </DialogFooter>
       </DialogContent>

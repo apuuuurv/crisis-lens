@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
-import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -43,20 +43,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
-          <Toaster
-            theme="dark"
-            richColors
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: 'rgba(3, 7, 18, 0.96)',
-                border: '1px solid rgba(34, 197, 94, 0.28)',
-                color: 'rgba(244, 244, 245, 1)',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 20px 60px -30px rgba(34, 197, 94, 0.55)',
-              },
-            }}
-          />
+          <Toaster richColors position="top-right" />
           <Analytics />
         </ThemeProvider>
       </body>

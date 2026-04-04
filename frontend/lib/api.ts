@@ -7,7 +7,12 @@ import {
   type ResourceStatus
 } from "./crisis-data"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+
+function extractImageFilename(description: string) {
+  const match = description.match(/File:\s*([^\s]+)$/i)
+  return match?.[1] ?? null
+}
 
 export interface BackendIncident {
   id: number
@@ -21,9 +26,12 @@ export interface BackendIncident {
   address: string | null
   status: string
   trust_status: string
+  reported_by: number
   upvotes: number
   is_verified: boolean
   created_at: string
+  updated_at?: string | null
+  image_filename?: string | null
 }
 
 export interface BackendResource {
@@ -40,6 +48,67 @@ export interface BackendAlert {
   message: string
   is_read: boolean
   created_at: string
+}
+
+export interface BackendIncidentReportDetail {
+  id: number
+  user_id: number
+  user_name: string
+  user_email: string
+  created_at: string
+  latitude: number
+  longitude: number
+  image_filename?: string | null
+  image_content_type?: string | null
+}
+
+export interface BackendIncidentReportHistory {
+  incident_id: number
+  incident_title: string
+  reports: BackendIncidentReportDetail[]
+}
+
+export interface BackendUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  created_at: string
+}
+
+export interface IncidentReportDetail {
+  id: string
+  user_id: number
+  user_name: string
+  user_email: string
+  created_at: Date
+  latitude: number
+  longitude: number
+  image_filename?: string
+  image_url?: string
+}
+
+export interface PendingResolutionRequest {
+  request_id: string
+  incident_id: string
+  incident_title: string
+  category: string
+  requested_at: Date
+  requested_by_admin_name: string
+  requested_by_admin_email: string
+}
+
+export interface AdminResolutionFeedback {
+  request_id: string
+  incident_id: string
+  incident_title: string
+  category: string
+  user_name: string
+  user_email: string
+  status: string
+  response_message?: string
+  created_at: Date
+  responded_at?: Date
 }
 
 // Removed Guest Credentials for Secure Auth
@@ -65,7 +134,7 @@ async function safeFetch(path: string, options: RequestInit = {}) {
   }
 
   try {
-    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers, cache: "no-store" })
     
     if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
        // Token expired or invalid, redirect to login
@@ -75,29 +144,44 @@ async function safeFetch(path: string, options: RequestInit = {}) {
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}))
-      return { ok: false, status: res.status, data: null, error: errorData.detail }
+      const rawText = await res.text().catch(() => "")
+      let errorDetail: unknown = undefined
+      if (rawText) {
+        try {
+          errorDetail = JSON.parse(rawText)?.detail
+        } catch {
+          errorDetail = rawText
+        }
+      }
+      return { ok: false, status: res.status, data: null, error: errorDetail || `Request failed with status ${res.status}` }
     }
     const data = await res.json()
     return { ok: true, status: res.status, data }
   } catch (error) {
-    return { ok: false, status: 503, data: null, error: "Backend Offline" }
+    const message = error instanceof Error ? error.message : "Backend Offline"
+    return { ok: false, status: 503, data: null, error: message }
   }
 }
 
-export const normalizeIncident = (inc: BackendIncident): Incident => ({
-  ...inc,
-  id: String(inc.id),
-  category: (inc.category.charAt(0).toUpperCase() + inc.category.slice(1)) as IncidentCategory,
-  status: (inc.status.charAt(0).toUpperCase() + inc.status.slice(1)) as IncidentStatus,
-  report_count: inc.report_count ?? 1,
-  timestamp: new Date(inc.created_at),
-  location: {
-    x: ((inc.longitude + 118.5) / 1) * 100,
-    y: 100 - ((inc.latitude - 33.5) / 1) * 100,
-  },
-  address: inc.address || undefined,
-})
+export const normalizeIncident = (inc: BackendIncident): Incident => {
+  const imageFilename = inc.image_filename ?? extractImageFilename(inc.description)
+
+  return {
+    ...inc,
+    id: String(inc.id),
+    category: (inc.category.charAt(0).toUpperCase() + inc.category.slice(1)) as IncidentCategory,
+    status: (inc.status.charAt(0).toUpperCase() + inc.status.slice(1)) as IncidentStatus,
+    report_count: inc.report_count ?? 1,
+    timestamp: new Date(inc.updated_at || inc.created_at),
+    location: {
+      x: ((inc.longitude + 118.5) / 1) * 100,
+      y: 100 - ((inc.latitude - 33.5) / 1) * 100,
+    },
+    image_filename: imageFilename ?? undefined,
+    image_url: imageFilename ? `${BASE_URL}/incidents/${inc.id}/image` : undefined,
+    address: inc.address || undefined,
+  }
+}
 
 export interface ReportSubmissionResult {
   incident: Incident
@@ -140,10 +224,10 @@ export const apiClient = {
     return { ok, data, error }
   },
 
-  logout: () => {
+  logout: (redirectTo: string = "/login") => {
     localStorage.removeItem("token")
     localStorage.removeItem("role")
-    window.location.href = "/login"
+    window.location.href = redirectTo
   },
 
   isAuthenticated: () => {
@@ -159,10 +243,103 @@ export const apiClient = {
     return role
   },
 
-  getIncidents: async () => {
-    const { ok, data } = await safeFetch("/incidents/")
+  getIncidents: async (options?: { includeResolved?: boolean }) => {
+    const params = new URLSearchParams()
+    if (options?.includeResolved) {
+      params.set("include_resolved", "true")
+    }
+    const path = params.size > 0 ? `/incidents/?${params.toString()}` : "/incidents/"
+    const { ok, data } = await safeFetch(path)
     if (!ok || !Array.isArray(data)) return []
     return data.map(normalizeIncident)
+  },
+
+  getMyReportedIncidents: async (options?: { includeResolved?: boolean }) => {
+    const params = new URLSearchParams()
+    if (options?.includeResolved !== undefined) {
+      params.set("include_resolved", String(options.includeResolved))
+    }
+    const path = params.size > 0 ? `/incidents/my-reports?${params.toString()}` : "/incidents/my-reports"
+    const { ok, data } = await safeFetch(path)
+    if (!ok || !Array.isArray(data)) return []
+    return data.map(normalizeIncident)
+  },
+
+  getIncidentReports: async (incidentId: string) => {
+    const { ok, data } = await safeFetch(`/incidents/${incidentId}/reports`)
+    if (!ok || !data || !Array.isArray(data.reports)) {
+      return null
+    }
+
+    return {
+      incident_id: String(data.incident_id),
+      incident_title: data.incident_title,
+      reports: data.reports.map((report: BackendIncidentReportDetail) => ({
+        id: String(report.id),
+        user_id: report.user_id,
+        user_name: report.user_name,
+        user_email: report.user_email,
+        created_at: new Date(report.created_at),
+        latitude: report.latitude,
+        longitude: report.longitude,
+        image_filename: report.image_filename ?? undefined,
+        image_url: report.image_filename ? `${BASE_URL}/incidents/report-submissions/${report.id}/image` : undefined,
+      })),
+    }
+  },
+
+  getPendingResolutionRequests: async () => {
+    const { ok, data } = await safeFetch("/incidents/pending-resolution-requests")
+    if (!ok || !Array.isArray(data)) return []
+    return data.map((item) => ({
+      request_id: String(item.request_id),
+      incident_id: String(item.incident_id),
+      incident_title: item.incident_title,
+      category: item.category,
+      requested_at: new Date(item.requested_at),
+      requested_by_admin_name: item.requested_by_admin_name,
+      requested_by_admin_email: item.requested_by_admin_email,
+    })) as PendingResolutionRequest[]
+  },
+
+  respondToResolutionRequest: async (requestId: string, payload: { resolved: boolean; message?: string }) => {
+    const { ok, data, error } = await safeFetch(`/incidents/resolution-requests/${requestId}/respond`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+    if (!ok) throw new Error(error || "Failed to submit your confirmation")
+    return data
+  },
+
+  requestIncidentResolution: async (incidentId: string) => {
+    const { ok, data, error } = await safeFetch(`/incidents/${incidentId}/request-resolution`, {
+      method: "POST",
+    })
+    if (!ok) throw new Error(error || "Failed to request resolution confirmation")
+    return data
+  },
+
+  getAdminResolutionFeedback: async () => {
+    const { ok, data } = await safeFetch("/incidents/admin-resolution-feedback")
+    if (!ok || !Array.isArray(data)) return []
+    return data.map((item) => ({
+      request_id: String(item.request_id),
+      incident_id: String(item.incident_id),
+      incident_title: item.incident_title,
+      category: item.category,
+      user_name: item.user_name,
+      user_email: item.user_email,
+      status: item.status,
+      response_message: item.response_message ?? undefined,
+      created_at: new Date(item.created_at),
+      responded_at: item.responded_at ? new Date(item.responded_at) : undefined,
+    })) as AdminResolutionFeedback[]
+  },
+
+  getMe: async () => {
+    const { ok, data } = await safeFetch("/auth/me")
+    if (!ok || !data) return null
+    return data as BackendUser
   },
 
   getResources: async () => {
@@ -211,6 +388,14 @@ export const apiClient = {
       method: "POST",
     })
     return ok ? normalizeIncident(data) : null
+  },
+
+  resolveIncident: async (incidentId: string) => {
+    const { ok, data, error } = await safeFetch(`/incidents/${incidentId}/resolve`, {
+      method: "POST",
+    })
+    if (!ok) throw new Error(error || "Failed to resolve incident")
+    return normalizeIncident(data)
   },
 
   updateLocation: async (lat: number, lng: number) => {

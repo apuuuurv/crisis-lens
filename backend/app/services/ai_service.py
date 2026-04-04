@@ -1,8 +1,167 @@
+import io
+import logging
+from datetime import datetime
+
 import numpy as np
+from PIL import Image, UnidentifiedImageError
 from sklearn.cluster import DBSCAN
 from sqlalchemy.orm import Session
-from datetime import datetime
+
 from app.models.core import Incident, ZoneRisk, IncidentStatus
+
+try:
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
+except ImportError:  # pragma: no cover - handled gracefully at runtime
+    torch = None
+    CLIPModel = None
+    CLIPProcessor = None
+
+logger = logging.getLogger(__name__)
+
+DISASTER_CANDIDATE_LABELS = [
+    "a photo of a fire emergency",
+    "a photo of a building fire",
+    "a photo of a wildfire",
+    "a photo of a flood disaster",
+    "a photo of heavy flooding",
+    "a photo of a car accident",
+    "a photo of a road accident",
+    "a photo of earthquake destruction",
+    "a photo of collapsed buildings",
+    "a photo of rescue workers at a disaster",
+]
+NORMAL_SCENE_LABELS = [
+    "a normal everyday scene with no emergency",
+    "a photo of a normal street with no emergency",
+    "a photo of a house in normal conditions",
+    "a photo of a peaceful outdoor scene",
+    "a photo of regular daily life with no disaster",
+]
+ALL_CANDIDATE_LABELS = DISASTER_CANDIDATE_LABELS + NORMAL_SCENE_LABELS
+NORMAL_SCENE_LABEL = "a normal everyday scene with no emergency"
+DISASTER_SCORE_MIN = 0.35
+NORMAL_ADVANTAGE_MARGIN = 0.12
+MAX_AI_IMAGE_DIMENSION = 1600
+
+
+class AIValidationError(RuntimeError):
+    pass
+
+
+class AIValidationService:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self.__class__._initialized:
+            return
+
+        self.model_name = "openai/clip-vit-base-patch32"
+        self.model = None
+        self.processor = None
+        self.device = "cpu"
+        self.load_error: str | None = None
+        self.__class__._initialized = True
+        self._load_model()
+
+    def _load_model(self) -> None:
+        if self.model is not None and self.processor is not None:
+            return
+
+        if torch is None or CLIPModel is None or CLIPProcessor is None:
+            self.load_error = (
+                "CLIP dependencies are not installed. Add torch, torchvision, transformers, and Pillow."
+            )
+            logger.warning(self.load_error)
+            return
+
+        try:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.model = CLIPModel.from_pretrained(self.model_name)
+            self.processor = CLIPProcessor.from_pretrained(self.model_name)
+            self.model.to(self.device)
+            self.model.eval()
+            self.load_error = None
+            logger.info("CLIP model loaded successfully on %s", self.device)
+        except Exception as exc:  # pragma: no cover - depends on model download/runtime
+            self.model = None
+            self.processor = None
+            self.load_error = f"Failed to load CLIP model: {exc}"
+            logger.exception("CLIP model initialization failed")
+
+    def warmup(self) -> None:
+        self._load_model()
+
+    def validate_image(self, image_bytes: bytes) -> dict:
+        if not image_bytes:
+            raise AIValidationError("Image file is empty.")
+
+        if self.model is None or self.processor is None:
+            self._load_model()
+
+        if self.model is None or self.processor is None:
+            raise AIValidationError(self.load_error or "AI validation model is unavailable.")
+
+        try:
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        except UnidentifiedImageError as exc:
+            raise AIValidationError("Uploaded file is not a valid image.") from exc
+        except Exception as exc:
+            raise AIValidationError(f"Unable to read uploaded image: {exc}") from exc
+
+        if max(image.size) > MAX_AI_IMAGE_DIMENSION:
+            image.thumbnail((MAX_AI_IMAGE_DIMENSION, MAX_AI_IMAGE_DIMENSION))
+
+        try:
+            inputs = self.processor(
+                text=ALL_CANDIDATE_LABELS,
+                images=image,
+                return_tensors="pt",
+                padding=True,
+            )
+            inputs = {key: value.to(self.device) for key, value in inputs.items()}
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                logits = outputs.logits_per_image
+                probabilities = logits.softmax(dim=1)[0]
+        except Exception as exc:  # pragma: no cover - hardware/runtime specific
+            raise AIValidationError(f"AI inference failed: {exc}") from exc
+
+        confidence, index = probabilities.max(dim=0)
+        predicted_label = ALL_CANDIDATE_LABELS[index.item()]
+        confidence_score = float(confidence.item())
+        probability_values = probabilities.tolist()
+
+        disaster_score = float(sum(probability_values[: len(DISASTER_CANDIDATE_LABELS)]))
+        normal_score = float(sum(probability_values[len(DISASTER_CANDIDATE_LABELS) :]))
+        top_is_normal = predicted_label in NORMAL_SCENE_LABELS
+
+        is_suspicious = (
+            normal_score >= disaster_score + NORMAL_ADVANTAGE_MARGIN
+            or (top_is_normal and confidence_score >= 0.30)
+            or disaster_score < DISASTER_SCORE_MIN
+        )
+
+        if is_suspicious and not top_is_normal:
+            predicted_label = NORMAL_SCENE_LABEL
+            confidence_score = max(normal_score, confidence_score)
+
+        return {
+            "label": predicted_label,
+            "confidence": confidence_score,
+            "is_suspicious": is_suspicious,
+            "disaster_score": disaster_score,
+            "normal_score": normal_score,
+        }
+
+
+ai_validation_service = AIValidationService()
 
 def calculate_zone_risk(incidents: list) -> float:
     """

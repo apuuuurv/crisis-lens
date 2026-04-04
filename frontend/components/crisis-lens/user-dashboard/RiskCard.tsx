@@ -35,7 +35,7 @@ export function RiskCard({ level, activeCount, summary }: RiskCardProps) {
   const style = riskStyles[level]
 
   return (
-    <Card className={`relative overflow-hidden rounded-[28px] border-white/10 bg-[#050816]/95 text-white ${style.glow}`}>
+    <Card className={`relative overflow-hidden rounded-[28px] border-glass-border bg-glass text-foreground ${style.glow}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${style.ring}`} />
       {level === 'HIGH' ? (
         <motion.div
@@ -56,24 +56,24 @@ export function RiskCard({ level, activeCount, summary }: RiskCardProps) {
               </Badge>
             </div>
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-zinc-500">Current area status</p>
+              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Current area status</p>
               <h2 className="mt-3 font-[family:var(--font-display)] text-4xl font-semibold tracking-tight sm:text-5xl">
                 {level === 'LOW' && 'Conditions look stable'}
                 {level === 'MEDIUM' && 'Stay alert nearby'}
                 {level === 'HIGH' && 'Elevated risk detected'}
               </h2>
             </div>
-            <p className="max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">{summary}</p>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">{summary}</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[280px]">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Active incidents</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{activeCount}</p>
+            <div className="rounded-3xl border border-border bg-card/80 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Active incidents</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{activeCount}</p>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Recommended action</p>
-              <p className="mt-2 text-sm font-medium text-zinc-200">
+            <div className="rounded-3xl border border-border bg-card/80 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recommended action</p>
+              <p className="mt-2 text-sm font-medium text-foreground">
                 {level === 'HIGH' ? 'Avoid affected zones and follow alerts.' : 'Keep notifications on for live updates.'}
               </p>
             </div>
