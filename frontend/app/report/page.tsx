@@ -31,10 +31,10 @@ export default function ReportPage() {
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-4 py-4">
-        <Link href="/">
+        <Link href="/dashboard">
           <Button variant="ghost" className="gap-2 text-muted-foreground">
             <ChevronLeft className="size-4" />
-            Home
+            Dashboard
           </Button>
         </Link>
       </div>

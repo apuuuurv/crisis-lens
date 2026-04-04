@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   MapPin, 
@@ -37,6 +38,7 @@ const ReportMap = dynamic(() => import("./report-map"), {
 })
 
 export function ReportView() {
+  const router = useRouter()
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -46,6 +48,23 @@ export function ReportView() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+
+  const persistRecentReportLocation = (lat: number, lng: number) => {
+    if (typeof window === "undefined") return
+    localStorage.setItem(
+      "recent_report_location",
+      JSON.stringify({
+        lat,
+        lng,
+        savedAt: Date.now(),
+      }),
+    )
+  }
+
+  const persistRecentReportedIncident = (incident: unknown) => {
+    if (typeof window === "undefined") return
+    localStorage.setItem("recent_reported_incident", JSON.stringify(incident))
+  }
 
   // 1. Geolocation on Mount
   useEffect(() => {
@@ -87,6 +106,7 @@ export function ReportView() {
 
   const handleLocationSelect = (lat: number, lng: number) => {
     setLocation([lat, lng])
+    persistRecentReportLocation(lat, lng)
     fetchAddress(lat, lng)
   }
 
@@ -137,6 +157,8 @@ export function ReportView() {
       }
 
       if (submissionResult.status === 201) {
+        persistRecentReportLocation(location[0], location[1])
+        persistRecentReportedIncident(submissionResult.incident)
         setIsSuccess(true)
         toast.success("Incident reported successfully")
       } else {
@@ -168,8 +190,8 @@ export function ReportView() {
         <p className="mb-8 max-w-xs text-muted-foreground">
           Thank you for your report. Emergency services have been notified and are reviewing the incident.
         </p>
-        <Button onClick={() => window.location.href = "/"} className="bg-emerald">
-          Back to Home
+        <Button onClick={() => router.push("/dashboard")} className="bg-emerald">
+          Back to Dashboard
         </Button>
       </div>
     )

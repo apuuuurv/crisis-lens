@@ -17,6 +17,9 @@ export interface Incident {
   is_verified: boolean
   location: { x: number; y: number }
   timestamp: Date
+  reported_by: number
+  image_filename?: string
+  image_url?: string
   latitude?: number
   longitude?: number
   address?: string
@@ -53,6 +56,7 @@ export const mockIncidents: Incident[] = [
     is_verified: true,
     location: { x: 35, y: 40 },
     timestamp: new Date(Date.now() - 15 * 60000),
+    reported_by: 1,
   },
   {
     id: "INC-002",
@@ -66,6 +70,7 @@ export const mockIncidents: Incident[] = [
     is_verified: true,
     location: { x: 65, y: 55 },
     timestamp: new Date(Date.now() - 30 * 60000),
+    reported_by: 2,
   },
   {
     id: "INC-003",
@@ -79,6 +84,7 @@ export const mockIncidents: Incident[] = [
     is_verified: false,
     location: { x: 50, y: 30 },
     timestamp: new Date(Date.now() - 5 * 60000),
+    reported_by: 3,
   },
   {
     id: "INC-004",
@@ -92,6 +98,7 @@ export const mockIncidents: Incident[] = [
     is_verified: true,
     location: { x: 75, y: 25 },
     timestamp: new Date(Date.now() - 45 * 60000),
+    reported_by: 2,
   },
   {
     id: "INC-005",
@@ -105,6 +112,7 @@ export const mockIncidents: Incident[] = [
     is_verified: true,
     location: { x: 25, y: 60 },
     timestamp: new Date(Date.now() - 10 * 60000),
+    reported_by: 1,
   },
   {
     id: "INC-006",
@@ -118,6 +126,7 @@ export const mockIncidents: Incident[] = [
     is_verified: false,
     location: { x: 80, y: 70 },
     timestamp: new Date(Date.now() - 60 * 60000),
+    reported_by: 4,
   },
 ]
 

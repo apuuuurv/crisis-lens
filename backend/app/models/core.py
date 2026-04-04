@@ -78,10 +78,28 @@ class ReportSubmission(Base):
     incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
+    image_filename = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User")
     incident = relationship("Incident")
+
+
+class ResolutionRequest(Base):
+    __tablename__ = "resolution_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    requested_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default="pending", nullable=False)
+    response_message = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+
+    incident = relationship("Incident")
+    user = relationship("User", foreign_keys=[user_id])
+    requested_by_admin = relationship("User", foreign_keys=[requested_by_admin_id])
 
 class Resource(Base):
     __tablename__ = "resources"

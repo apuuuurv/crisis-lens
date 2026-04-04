@@ -6,9 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Incident } from '@/lib/crisis-data'
+import { statusColors } from '@/lib/crisis-data'
 
 interface IncidentListProps {
-  incidents: Array<Incident & { distanceLabel: string; relativeTime: string }>
+  incidents: Array<Incident & { distanceKm?: number | null; distanceLabel: string; relativeTime: string }>
+  title?: string
+  description?: string
+  emptyMessage?: string
 }
 
 const severityTone = {
@@ -41,17 +45,22 @@ function getSeverityLevel(incident: Incident) {
   return 'low'
 }
 
-export function IncidentList({ incidents }: IncidentListProps) {
+export function IncidentList({
+  incidents,
+  title = 'Nearby incidents',
+  description = 'Live events within 10 km of your location with time and distance context.',
+  emptyMessage = 'No incidents found within 10 km',
+}: IncidentListProps) {
   return (
-    <Card className="rounded-[28px] border-white/10 bg-[#050816]/95 text-white shadow-[0_30px_90px_-50px_rgba(16,185,129,0.35)]">
+    <Card className="rounded-[28px] border-glass-border bg-glass text-foreground shadow-[0_30px_90px_-50px_rgba(16,185,129,0.35)]">
       <CardHeader className="pb-2">
-        <CardTitle className="font-[family:var(--font-display)] text-2xl">Nearby incidents</CardTitle>
-        <p className="text-sm text-zinc-400">Live events around your location with time and distance context.</p>
+        <CardTitle className="font-[family:var(--font-display)] text-2xl">{title}</CardTitle>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent>
         {incidents.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-white/10 px-5 py-10 text-center text-sm text-zinc-400">
-            No recent activity
+          <div className="rounded-3xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground">
+            {emptyMessage}
           </div>
         ) : (
           <ScrollArea className="h-[360px] pr-3">
@@ -76,7 +85,7 @@ export function IncidentList({ incidents }: IncidentListProps) {
                       visible: { opacity: 1, y: 0 },
                     }}
                     whileHover={{ scale: 1.01, y: -2 }}
-                    className="rounded-[24px] border border-white/10 bg-white/5 p-4 transition-colors hover:bg-white/[0.08]"
+                    className="rounded-[24px] border border-border bg-card/80 p-4 transition-colors hover:bg-accent/70"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400">
@@ -84,15 +93,19 @@ export function IncidentList({ incidents }: IncidentListProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-semibold text-white">{incident.title || incident.category}</p>
+                          <p className="truncate font-semibold text-foreground">{incident.title || incident.category}</p>
+                          <Badge variant="secondary" className={`rounded-full border px-3 py-1 ${statusColors[incident.status]}`}>
+                            {incident.status}
+                          </Badge>
                           <Badge className={`rounded-full border px-3 py-1 ${severityTone[severity]}`}>
                             {severity.toUpperCase()}
                           </Badge>
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-zinc-400">
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                           <span>{incident.relativeTime}</span>
                           <span>{incident.distanceLabel}</span>
                           <span>{incident.category}</span>
+                          <span>{incident.report_count} reports</span>
                         </div>
                       </div>
                     </div>
