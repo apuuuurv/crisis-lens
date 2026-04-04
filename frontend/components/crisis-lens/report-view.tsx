@@ -46,8 +46,12 @@ export function ReportView() {
   const [location, setLocation] = useState<[number, number] | null>(null)
   const [address, setAddress] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [isProcessingImage, setIsProcessingImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+
+  const MAX_UPLOAD_SIZE_BYTES = 4 * 1024 * 1024
+  const MAX_IMAGE_DIMENSION = 1600
 
   const persistRecentReportLocation = (lat: number, lng: number) => {
     if (typeof window === "undefined") return
@@ -110,10 +114,71 @@ export function ReportView() {
     fetchAddress(lat, lng)
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = async (file: File) => {
+    if (file.size <= MAX_UPLOAD_SIZE_BYTES) {
+      return file
+    }
+
+    const imageUrl = URL.createObjectURL(file)
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error("Unable to read selected image"))
+        img.src = imageUrl
+      })
+
+      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.width, image.height))
+      const canvas = document.createElement("canvas")
+      canvas.width = Math.max(1, Math.round(image.width * scale))
+      canvas.height = Math.max(1, Math.round(image.height * scale))
+
+      const context = canvas.getContext("2d")
+      if (!context) {
+        throw new Error("Image compression is not supported in this browser")
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+      let quality = 0.88
+      let blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality))
+
+      while (blob && blob.size > MAX_UPLOAD_SIZE_BYTES && quality > 0.45) {
+        quality -= 0.08
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality))
+      }
+
+      if (!blob) {
+        throw new Error("Failed to compress image")
+      }
+
+      return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "upload"}.jpg`, {
+        type: "image/jpeg",
+        lastModified: Date.now(),
+      })
+    } finally {
+      URL.revokeObjectURL(imageUrl)
+    }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files?.[0]) {
-      setUploadedFiles([files[0]])
+    if (!files?.[0]) return
+
+    setIsProcessingImage(true)
+    try {
+      const processedFile = await compressImage(files[0])
+      setUploadedFiles([processedFile])
+      if (processedFile !== files[0]) {
+        toast.success("Large image optimized for upload")
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to process selected image"
+      toast.error(message)
+    } finally {
+      setIsProcessingImage(false)
+      e.target.value = ""
     }
   }
 
@@ -372,10 +437,10 @@ export function ReportView() {
 
             <Button 
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isProcessingImage}
               className="w-full bg-emerald py-6 text-lg font-bold"
             >
-              {isSubmitting ? "Submitting..." : "SUBMIT REPORT"}
+              {isProcessingImage ? "Preparing image..." : isSubmitting ? "Submitting..." : "SUBMIT REPORT"}
             </Button>
             
             <div className="flex items-center gap-2 rounded-lg bg-amber/5 p-3 text-xs text-amber-600 dark:text-amber-400">
