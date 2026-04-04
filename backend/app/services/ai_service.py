@@ -19,18 +19,45 @@ except ImportError:  # pragma: no cover - handled gracefully at runtime
 
 logger = logging.getLogger(__name__)
 
-DISASTER_CANDIDATE_LABELS = [
-    "a photo of a fire emergency",
-    "a photo of a building fire",
-    "a photo of a wildfire",
-    "a photo of a flood disaster",
-    "a photo of heavy flooding",
-    "a photo of a car accident",
-    "a photo of a road accident",
-    "a photo of earthquake destruction",
-    "a photo of collapsed buildings",
-    "a photo of rescue workers at a disaster",
-]
+CATEGORY_LABELS = {
+    "fire": [
+        "a photo of a fire emergency",
+        "a photo of a building fire",
+        "a photo of a wildfire",
+        "a photo of flames and smoke from a fire disaster",
+    ],
+    "flood": [
+        "a photo of a flood disaster",
+        "a photo of heavy flooding",
+        "a photo of streets submerged in flood water",
+    ],
+    "earthquake": [
+        "a photo of earthquake destruction",
+        "a photo of collapsed buildings",
+        "a photo of structural damage after an earthquake",
+    ],
+    "storm": [
+        "a photo of storm damage",
+        "a photo of severe cyclone destruction",
+        "a photo of trees and houses damaged by a storm",
+    ],
+    "chemical": [
+        "a photo of a chemical leak emergency",
+        "a photo of toxic smoke from an industrial accident",
+        "a photo of hazardous material spill response",
+    ],
+    "medical": [
+        "a photo of a medical emergency",
+        "a photo of paramedics helping an injured person",
+        "a photo of an ambulance responding to an emergency",
+    ],
+    "accident": [
+        "a photo of a car accident",
+        "a photo of a road accident",
+        "a photo of emergency responders at a crash site",
+    ],
+}
+DISASTER_CANDIDATE_LABELS = [label for labels in CATEGORY_LABELS.values() for label in labels]
 NORMAL_SCENE_LABELS = [
     "a normal everyday scene with no emergency",
     "a photo of a normal street with no emergency",
@@ -42,6 +69,8 @@ ALL_CANDIDATE_LABELS = DISASTER_CANDIDATE_LABELS + NORMAL_SCENE_LABELS
 NORMAL_SCENE_LABEL = "a normal everyday scene with no emergency"
 DISASTER_SCORE_MIN = 0.35
 NORMAL_ADVANTAGE_MARGIN = 0.12
+EXPECTED_CATEGORY_SCORE_MIN = 0.20
+EXPECTED_CATEGORY_MARGIN = 0.05
 MAX_AI_IMAGE_DIMENSION = 1600
 
 
@@ -98,7 +127,7 @@ class AIValidationService:
     def warmup(self) -> None:
         self._load_model()
 
-    def validate_image(self, image_bytes: bytes) -> dict:
+    def validate_image(self, image_bytes: bytes, expected_category: str | None = None) -> dict:
         if not image_bytes:
             raise AIValidationError("Image file is empty.")
 
@@ -141,12 +170,61 @@ class AIValidationService:
         disaster_score = float(sum(probability_values[: len(DISASTER_CANDIDATE_LABELS)]))
         normal_score = float(sum(probability_values[len(DISASTER_CANDIDATE_LABELS) :]))
         top_is_normal = predicted_label in NORMAL_SCENE_LABELS
+        category_scores = {}
+        disaster_probabilities = probability_values[: len(DISASTER_CANDIDATE_LABELS)]
+        label_cursor = 0
+        for category_name, labels in CATEGORY_LABELS.items():
+            label_count = len(labels)
+            category_scores[category_name] = float(
+                sum(disaster_probabilities[label_cursor : label_cursor + label_count])
+            )
+            label_cursor += label_count
+
+        predicted_category = (
+            max(category_scores, key=category_scores.get) if category_scores else None
+        )
 
         is_suspicious = (
             normal_score >= disaster_score + NORMAL_ADVANTAGE_MARGIN
             or (top_is_normal and confidence_score >= 0.30)
             or disaster_score < DISASTER_SCORE_MIN
         )
+
+        normalized_expected_category = (expected_category or "").strip().lower()
+        expected_category_score = None
+        is_valid_for_category = not is_suspicious
+        validation_message = None
+
+        if normalized_expected_category in CATEGORY_LABELS:
+            expected_category_score = category_scores.get(normalized_expected_category, 0.0)
+            highest_other_category_score = max(
+                (
+                    score
+                    for category_name, score in category_scores.items()
+                    if category_name != normalized_expected_category
+                ),
+                default=0.0,
+            )
+            is_valid_for_category = (
+                not is_suspicious
+                and predicted_category == normalized_expected_category
+                and expected_category_score >= EXPECTED_CATEGORY_SCORE_MIN
+                and expected_category_score >= highest_other_category_score + EXPECTED_CATEGORY_MARGIN
+            )
+
+            if not is_valid_for_category:
+                if is_suspicious:
+                    validation_message = (
+                        f"No valid image found for the selected {expected_category} disaster."
+                    )
+                elif predicted_category:
+                    validation_message = (
+                        f"Uploaded image looks more like {predicted_category.title()} than {expected_category}."
+                    )
+                else:
+                    validation_message = (
+                        f"No valid image found for the selected {expected_category} disaster."
+                    )
 
         if is_suspicious and not top_is_normal:
             predicted_label = NORMAL_SCENE_LABEL
@@ -158,6 +236,12 @@ class AIValidationService:
             "is_suspicious": is_suspicious,
             "disaster_score": disaster_score,
             "normal_score": normal_score,
+            "predicted_category": predicted_category,
+            "category_scores": category_scores,
+            "expected_category": normalized_expected_category or None,
+            "expected_category_score": expected_category_score,
+            "is_valid_for_category": is_valid_for_category,
+            "validation_message": validation_message,
         }
 
 

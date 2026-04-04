@@ -762,6 +762,7 @@ async def report_incident_via_image(
         final_lat = latitude if latitude is not None else 19.0760
         final_lng = longitude if longitude is not None else 72.8777
         final_title = title if title else "Image-based Incident Report"
+        final_cat = category if category else "Other"
 
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         _, file_extension = os.path.splitext(file.filename or "")
@@ -769,7 +770,7 @@ async def report_incident_via_image(
         saved_path = os.path.join(UPLOAD_DIR, saved_filename)
 
         try:
-            ai_result = ai_validation_service.validate_image(image_bytes)
+            ai_result = ai_validation_service.validate_image(image_bytes, expected_category=final_cat)
         except AIValidationError as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         except Exception as exc:
@@ -782,13 +783,19 @@ async def report_incident_via_image(
         ai_label = ai_result["label"]
         ai_confidence = ai_result["confidence"]
         is_suspicious = ai_result["is_suspicious"]
+        is_valid_for_category = ai_result.get("is_valid_for_category", True)
+        validation_message = ai_result.get("validation_message")
+        if not is_valid_for_category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=validation_message or f"No valid image found for the selected {final_cat} disaster.",
+            )
         trust_status = IncidentTrustStatus.suspicious.value if is_suspicious else "Verified"
         confidence_percentage = round(ai_confidence * 100, 2)
         final_desc = description if description else (
             f"Citizen-submitted image analyzed by CLIP. "
             f"Predicted: {ai_label}. Confidence: {confidence_percentage}. Trust: {trust_status}. File: {saved_filename}"
         )
-        final_cat = category if category else "Other"
         final_sev = severity if severity is not None else 5
         final_address = address if address else None
 
