@@ -32,3 +32,55 @@ class IncidentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class IncidentReportDetail(BaseModel):
+    id: int
+    user_id: int
+    user_name: str
+    user_email: str
+    created_at: datetime
+    latitude: float
+    longitude: float
+    image_filename: str | None = None
+
+
+class IncidentReportHistoryResponse(BaseModel):
+    incident_id: int
+    incident_title: str
+    reports: list[IncidentReportDetail]
+
+
+class PendingResolutionRequestResponse(BaseModel):
+    request_id: int
+    incident_id: int
+    incident_title: str
+    category: str
+    requested_at: datetime
+    requested_by_admin_name: str
+    requested_by_admin_email: str
+
+
+class ResolutionRequestAction(BaseModel):
+    resolved: bool
+    message: str | None = None
+
+
+class ResolutionRequestActionResponse(BaseModel):
+    request_id: int
+    incident_id: int
+    status: str
+    response_message: str | None = None
+
+
+class AdminResolutionFeedbackResponse(BaseModel):
+    request_id: int
+    incident_id: int
+    incident_title: str
+    category: str
+    user_name: str
+    user_email: str
+    status: str
+    response_message: str | None = None
+    created_at: datetime
+    responded_at: datetime | None = None

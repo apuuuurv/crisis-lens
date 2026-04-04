@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   if (authState === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#030507]">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     )
@@ -34,7 +34,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       {authState === "admin" ? (
-        <Dashboard onBackToLanding={() => router.push("/")} />
+        <Dashboard onBackToLanding={() => apiClient.logout("/")} />
       ) : (
         <UserDashboard onLogout={() => apiClient.logout()} />
       )}

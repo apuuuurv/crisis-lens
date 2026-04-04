@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
+from pathlib import Path
+import mimetypes
 
 from app.database import engine, Base
 from app.models import core
@@ -25,6 +28,13 @@ def ensure_schema_updates() -> None:
             connection.execute(
                 text("UPDATE incidents SET trust_status = 'Trusted' WHERE trust_status IS NULL")
             )
+    if "report_submissions" in inspector.get_table_names():
+        report_submission_columns = {column["name"] for column in inspector.get_columns("report_submissions")}
+        with engine.begin() as connection:
+            if "image_filename" not in report_submission_columns:
+                connection.execute(
+                    text("ALTER TABLE report_submissions ADD COLUMN image_filename VARCHAR")
+                )
 
 Base.metadata.create_all(bind=engine)
 ensure_schema_updates()
@@ -52,6 +62,15 @@ app.include_router(websocket_router)
 app.include_router(resource_router)
 # FIXED: Using the imported alias
 app.include_router(alert_router) 
+
+mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("image/jpeg", ".jpeg")
+mimetypes.add_type("image/jpeg", ".jpg")
+mimetypes.add_type("image/png", ".png")
+
+uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 @app.get("/")
 def read_root():
