@@ -1,13 +1,20 @@
 import type { Metadata, Viewport } from 'next'
+import { Plus_Jakarta_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { Preloader } from '@/components/Preloader'
 import './globals.css'
 
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+})
+
 export const metadata: Metadata = {
-  title: 'Crisis Lens | Real-Time Incident Awareness',
+  title: 'CrisisLens | Real-Time Incident Dashboard',
   description:
-    'Stay informed about nearby incidents with real-time risk signals, live alerts, and faster reporting through Crisis Lens.',
+    'Stay informed about nearby incidents with real-time risk signals, live alerts, and faster reporting through CrisisLens.',
   icons: {
     icon: [
       {
@@ -28,7 +35,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#020617',
+  themeColor: '#1A1C1E',
   width: 'device-width',
   initialScale: 1,
 }
@@ -39,9 +46,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={jakarta.variable}>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <Preloader />
           {children}
           <Toaster richColors position="top-right" />
           <Analytics />
