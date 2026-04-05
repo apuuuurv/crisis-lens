@@ -25,10 +25,15 @@ class IncidentResponse(BaseModel):
     trust_status: str
     reported_by: int
     created_at: datetime
+    updated_at: datetime | None = None
+    image_filename: str | None = None
     
     # NEW FIELDS ADDED HERE
     upvotes: int
     is_verified: bool
+    ai_label: str | None = None
+    ai_confidence: float | None = None
+    is_suspicious: bool
 
     class Config:
         from_attributes = True
@@ -43,6 +48,7 @@ class IncidentReportDetail(BaseModel):
     latitude: float
     longitude: float
     image_filename: str | None = None
+    image_content_type: str | None = None
 
 
 class IncidentReportHistoryResponse(BaseModel):

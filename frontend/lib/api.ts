@@ -7,7 +7,7 @@ import {
   type ResourceStatus
 } from "./crisis-data"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
 
 function extractImageFilename(description: string) {
   const match = description.match(/File:\s*([^\s]+)$/i)
@@ -30,6 +30,8 @@ export interface BackendIncident {
   upvotes: number
   is_verified: boolean
   created_at: string
+  updated_at?: string | null
+  image_filename?: string | null
 }
 
 export interface BackendResource {
@@ -57,6 +59,7 @@ export interface BackendIncidentReportDetail {
   latitude: number
   longitude: number
   image_filename?: string | null
+  image_content_type?: string | null
 }
 
 export interface BackendIncidentReportHistory {
@@ -141,18 +144,27 @@ async function safeFetch(path: string, options: RequestInit = {}) {
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}))
-      return { ok: false, status: res.status, data: null, error: errorData.detail }
+      const rawText = await res.text().catch(() => "")
+      let errorDetail: unknown = undefined
+      if (rawText) {
+        try {
+          errorDetail = JSON.parse(rawText)?.detail
+        } catch {
+          errorDetail = rawText
+        }
+      }
+      return { ok: false, status: res.status, data: null, error: errorDetail || `Request failed with status ${res.status}` }
     }
     const data = await res.json()
     return { ok: true, status: res.status, data }
   } catch (error) {
-    return { ok: false, status: 503, data: null, error: "Backend Offline" }
+    const message = error instanceof Error ? error.message : "Backend Offline"
+    return { ok: false, status: 503, data: null, error: message }
   }
 }
 
 export const normalizeIncident = (inc: BackendIncident): Incident => {
-  const imageFilename = extractImageFilename(inc.description)
+  const imageFilename = inc.image_filename ?? extractImageFilename(inc.description)
 
   return {
     ...inc,
@@ -160,13 +172,13 @@ export const normalizeIncident = (inc: BackendIncident): Incident => {
     category: (inc.category.charAt(0).toUpperCase() + inc.category.slice(1)) as IncidentCategory,
     status: (inc.status.charAt(0).toUpperCase() + inc.status.slice(1)) as IncidentStatus,
     report_count: inc.report_count ?? 1,
-    timestamp: new Date(inc.created_at),
+    timestamp: new Date(inc.updated_at || inc.created_at),
     location: {
       x: ((inc.longitude + 118.5) / 1) * 100,
       y: 100 - ((inc.latitude - 33.5) / 1) * 100,
     },
     image_filename: imageFilename ?? undefined,
-    image_url: imageFilename ? `${BASE_URL}/uploads/${imageFilename}` : undefined,
+    image_url: imageFilename ? `${BASE_URL}/incidents/${inc.id}/image` : undefined,
     address: inc.address || undefined,
   }
 }
@@ -271,7 +283,7 @@ export const apiClient = {
         latitude: report.latitude,
         longitude: report.longitude,
         image_filename: report.image_filename ?? undefined,
-        image_url: report.image_filename ? `${BASE_URL}/uploads/${report.image_filename}` : undefined,
+        image_url: report.image_filename ? `${BASE_URL}/incidents/report-submissions/${report.id}/image` : undefined,
       })),
     }
   },

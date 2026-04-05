@@ -206,7 +206,7 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
       }
     }
 
-    ws.current = new WebSocket("ws://localhost:8000/ws/incidents")
+    ws.current = new WebSocket("ws://127.0.0.1:8000/ws/incidents")
     ws.current.onmessage = (event) => {
       const message = JSON.parse(event.data)
       if (

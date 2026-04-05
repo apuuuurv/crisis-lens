@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import os
 from typing import Iterable, List
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.auth_routes import allow_admin_only, allow_any_user
@@ -29,9 +31,11 @@ from app.schemas.incident import (
     ResolutionRequestActionResponse,
     IncidentResponse,
 )
+from app.services.ai_service import AIValidationError, ai_validation_service
 from app.utils.geo import calculate_distance_km
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
+logger = logging.getLogger(__name__)
 
 DEDUP_RADIUS_KM = 0.5
 CONFLICT_RADIUS_KM = 0.5
@@ -43,6 +47,7 @@ CONFLICTING_CATEGORIES = {
     "flood": {"fire"},
 }
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
 
 def _check_submission_cooldown(
@@ -171,6 +176,8 @@ def _record_submission(
     latitude: float,
     longitude: float,
     image_filename: str | None = None,
+    image_content_type: str | None = None,
+    image_data: bytes | None = None,
 ) -> None:
     db.add(
         ReportSubmission(
@@ -179,6 +186,8 @@ def _record_submission(
             latitude=latitude,
             longitude=longitude,
             image_filename=image_filename,
+            image_content_type=image_content_type,
+            image_data=image_data,
         )
     )
 
@@ -230,6 +239,11 @@ async def _process_incident_submission(
     address: str | None,
     current_user: User,
     evidence_filename: str | None = None,
+    evidence_content_type: str | None = None,
+    evidence_bytes: bytes | None = None,
+    ai_label: str | None = None,
+    ai_confidence: float | None = None,
+    is_suspicious: bool = False,
 ) -> Incident:
     _check_submission_cooldown(
         db,
@@ -247,6 +261,7 @@ async def _process_incident_submission(
 
     if matched_incident:
         matched_incident.report_count += 1
+        matched_incident.updated_at = datetime.now(timezone.utc)
         if evidence_filename:
             existing_description = (matched_incident.description or "").strip()
             evidence_note = f"Additional image evidence received. File: {evidence_filename}"
@@ -258,6 +273,16 @@ async def _process_incident_submission(
                 )
             matched_incident.is_verified = True
             matched_incident.trust_status = "Verified"
+            matched_incident.image_filename = evidence_filename
+            matched_incident.image_content_type = evidence_content_type
+            matched_incident.image_data = evidence_bytes
+        if ai_label is not None:
+            matched_incident.ai_label = ai_label
+            matched_incident.ai_confidence = ai_confidence
+            matched_incident.is_suspicious = is_suspicious
+            if is_suspicious:
+                matched_incident.trust_status = IncidentTrustStatus.suspicious.value
+                matched_incident.is_verified = False
         _record_submission(
             db,
             user_id=current_user.id,
@@ -265,6 +290,8 @@ async def _process_incident_submission(
             latitude=latitude,
             longitude=longitude,
             image_filename=evidence_filename,
+            image_content_type=evidence_content_type,
+            image_data=evidence_bytes,
         )
         flagged_incidents = _apply_conflict_review(db, subject_incident=matched_incident)
         db.commit()
@@ -285,6 +312,12 @@ async def _process_incident_submission(
         longitude=longitude,
         address=address,
         reported_by=current_user.id,
+        ai_label=ai_label,
+        ai_confidence=ai_confidence,
+        is_suspicious=is_suspicious,
+        image_filename=evidence_filename,
+        image_content_type=evidence_content_type,
+        image_data=evidence_bytes,
     )
     db.add(new_incident)
     db.flush()
@@ -296,6 +329,8 @@ async def _process_incident_submission(
         latitude=latitude,
         longitude=longitude,
         image_filename=evidence_filename,
+        image_content_type=evidence_content_type,
+        image_data=evidence_bytes,
     )
     _create_geofence_alerts(db, new_incident)
     flagged_incidents = _apply_conflict_review(db, subject_incident=new_incident)
@@ -354,7 +389,7 @@ def get_all_incidents(
     query = db.query(Incident)
     if not include_resolved:
         query = query.filter(Incident.status != IncidentStatus.resolved)
-    return query.all()
+    return query.order_by(Incident.updated_at.desc(), Incident.created_at.desc()).all()
 
 
 @router.get("/my-reports", response_model=List[IncidentResponse])
@@ -376,7 +411,7 @@ def get_my_reported_incidents(
     query = (
         db.query(Incident)
         .filter(Incident.id.in_(submission_incident_ids))
-        .order_by(Incident.created_at.desc())
+        .order_by(Incident.updated_at.desc(), Incident.created_at.desc())
     )
     if not include_resolved:
         query = query.filter(Incident.status != IncidentStatus.resolved)
@@ -631,6 +666,7 @@ def get_incident_reports(
             latitude=submission.latitude,
             longitude=submission.longitude,
             image_filename=submission.image_filename,
+            image_content_type=submission.image_content_type,
         )
         for submission, user in submissions
     ]
@@ -640,6 +676,62 @@ def get_incident_reports(
         incident_title=incident.title,
         reports=reports,
     )
+
+
+@router.get("/{incident_id}/image")
+def get_incident_image(
+    incident_id: int,
+    db: Session = Depends(get_db),
+):
+    incident = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if incident.image_data:
+        return Response(
+            content=incident.image_data,
+            media_type=incident.image_content_type or "application/octet-stream",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    if incident.image_filename:
+        saved_path = os.path.join(UPLOAD_DIR, incident.image_filename)
+        if os.path.exists(saved_path):
+            return FileResponse(
+                saved_path,
+                media_type=incident.image_content_type or "application/octet-stream",
+                filename=incident.image_filename,
+            )
+
+    raise HTTPException(status_code=404, detail="Incident image not found")
+
+
+@router.get("/report-submissions/{report_id}/image")
+def get_report_submission_image(
+    report_id: int,
+    db: Session = Depends(get_db),
+):
+    submission = db.query(ReportSubmission).filter(ReportSubmission.id == report_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Report submission not found")
+
+    if submission.image_data:
+        return Response(
+            content=submission.image_data,
+            media_type=submission.image_content_type or "application/octet-stream",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    if submission.image_filename:
+        saved_path = os.path.join(UPLOAD_DIR, submission.image_filename)
+        if os.path.exists(saved_path):
+            return FileResponse(
+                saved_path,
+                media_type=submission.image_content_type or "application/octet-stream",
+                filename=submission.image_filename,
+            )
+
+    raise HTTPException(status_code=404, detail="Report image not found")
 
 
 @router.post("/upload", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
@@ -655,45 +747,94 @@ async def report_incident_via_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(allow_any_user),
 ):
-    image_bytes = await file.read()
-    if not image_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image file is required.")
+    try:
+        image_bytes = await file.read()
+        if not image_bytes:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image file is required.")
+        if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Uploaded image exceeds the 10MB size limit.",
+            )
+        if file.content_type and not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file must be an image.")
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    _, file_extension = os.path.splitext(file.filename or "")
-    saved_filename = f"{uuid4().hex}{file_extension or '.jpg'}"
-    saved_path = os.path.join(UPLOAD_DIR, saved_filename)
+        final_lat = latitude if latitude is not None else 19.0760
+        final_lng = longitude if longitude is not None else 72.8777
+        final_title = title if title else "Image-based Incident Report"
+        final_cat = category if category else "Other"
 
-    with open(saved_path, "wb") as upload_file:
-        upload_file.write(image_bytes)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        _, file_extension = os.path.splitext(file.filename or "")
+        saved_filename = f"{uuid4().hex}{file_extension or '.jpg'}"
+        saved_path = os.path.join(UPLOAD_DIR, saved_filename)
 
-    final_lat = latitude if latitude is not None else 19.0760
-    final_lng = longitude if longitude is not None else 72.8777
-    final_title = title if title else "Image-based Incident Report"
-    confidence_score = 100
-    trust_status = "Verified"
-    final_desc = description if description else f"Citizen-submitted image saved for manual review. Confidence: {confidence_score}. Trust: {trust_status}. File: {saved_filename}"
-    final_cat = category if category else "Other"
-    final_sev = severity if severity is not None else 5
-    final_address = address if address else None
+        try:
+            ai_result = ai_validation_service.validate_image(image_bytes, expected_category=final_cat)
+        except AIValidationError as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Unexpected AI validation failure during image upload")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"AI validation failed: {exc}",
+            ) from exc
 
-    incident = await _process_incident_submission(
-        db,
-        title=final_title,
-        description=final_desc,
-        category=final_cat,
-        severity=final_sev,
-        latitude=final_lat,
-        longitude=final_lng,
-        address=final_address,
-        current_user=current_user,
-        evidence_filename=saved_filename,
-    )
-    incident.trust_status = trust_status
-    incident.is_verified = True
-    db.commit()
-    db.refresh(incident)
-    return incident
+        ai_label = ai_result["label"]
+        ai_confidence = ai_result["confidence"]
+        is_suspicious = ai_result["is_suspicious"]
+        is_valid_for_category = ai_result.get("is_valid_for_category", True)
+        validation_message = ai_result.get("validation_message")
+        if not is_valid_for_category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=validation_message or f"No valid image found for the selected {final_cat} disaster.",
+            )
+        trust_status = IncidentTrustStatus.suspicious.value if is_suspicious else "Verified"
+        confidence_percentage = round(ai_confidence * 100, 2)
+        final_desc = description if description else (
+            f"Citizen-submitted image analyzed by CLIP. "
+            f"Predicted: {ai_label}. Confidence: {confidence_percentage}. Trust: {trust_status}. File: {saved_filename}"
+        )
+        final_sev = severity if severity is not None else 5
+        final_address = address if address else None
+
+        with open(saved_path, "wb") as upload_file:
+            upload_file.write(image_bytes)
+
+        incident = await _process_incident_submission(
+            db,
+            title=final_title,
+            description=final_desc,
+            category=final_cat,
+            severity=final_sev,
+            latitude=final_lat,
+            longitude=final_lng,
+            address=final_address,
+            current_user=current_user,
+            evidence_filename=saved_filename,
+            evidence_content_type=file.content_type,
+            evidence_bytes=image_bytes,
+            ai_label=ai_label,
+            ai_confidence=ai_confidence,
+            is_suspicious=is_suspicious,
+        )
+        incident.trust_status = trust_status
+        incident.is_verified = not is_suspicious
+        incident.ai_label = ai_label
+        incident.ai_confidence = ai_confidence
+        incident.is_suspicious = is_suspicious
+        db.commit()
+        db.refresh(incident)
+        return incident
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unhandled error during image-based incident upload")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Image upload failed: {exc}",
+        ) from exc
 
 
 @router.delete("/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
