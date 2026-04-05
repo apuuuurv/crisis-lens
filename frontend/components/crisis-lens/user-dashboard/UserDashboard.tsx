@@ -384,7 +384,7 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
 
             <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
               <IncidentList incidents={nearbyIncidents} />
-              <AlertPanel alerts={enrichedAlerts} />
+              <AlertPanel userLocation={userLocation} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">

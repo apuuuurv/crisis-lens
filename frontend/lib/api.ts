@@ -398,4 +398,13 @@ export const apiClient = {
     if (!ok || !Array.isArray(data)) return []
     return data as BackendAlert[]
   },
+
+  getSafetyRecommendations: async (lat: number, lng: number) => {
+    const params = new URLSearchParams()
+    params.set("lat", String(lat))
+    params.set("lng", String(lng))
+    const { ok, data } = await safeFetch(`/alerts/recommendations?${params.toString()}`)
+    if (!ok || !Array.isArray(data)) return []
+    return data
+  },
 }

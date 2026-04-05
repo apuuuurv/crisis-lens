@@ -33,3 +33,15 @@ def get_my_alerts(
     """Fetches all danger alerts sent to this specific user."""
     alerts = db.query(Alert).filter(Alert.user_id == current_user.id).order_by(Alert.created_at.desc()).all()
     return alerts
+
+from app.services.recommendation_service import generate_recommendations
+
+@router.get("/recommendations")
+def get_recommendations(
+    lat: float,
+    lng: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(allow_any_user)
+):
+    """Fetches localized safety recommendations based on current incidents."""
+    return generate_recommendations(db, lat, lng)
